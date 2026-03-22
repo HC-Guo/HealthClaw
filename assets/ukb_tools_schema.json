@@ -1,0 +1,217 @@
+[
+  {"type": "function", "function": {
+    "name": "load_patient",
+    "description": "加载患者的基础临床数据（人口学、生化指标、既往史、影像报告等），返回自然语言摘要。这是每个分析任务的第一步。cost=0.01。",
+    "parameters": {"type": "object", "properties": {
+      "eid": {"type": "string", "description": "UKB 患者唯一标识符 (eid)"},
+      "disease_context": {"type": "string", "description": "本次分析的疾病背景（如 breast_cancer, CAD, T2D），用于后续策略查询"}
+    }, "required": ["eid"]}
+  }},
+  {"type": "function", "function": {
+    "name": "query_genetic_risk",
+    "description": "查询患者特定基因区域的变异信息或计算多基因风险评分(PRS)。返回检出变异的临床意义解读。cost=0.2。适用：怀疑遗传因素时，尤其家族史阳性、早发疾病。调用前请先检查L1索引和策略建议。",
+    "parameters": {"type": "object", "properties": {
+      "query_mode": {"type": "string", "enum": ["by_gene", "by_pathway", "by_prs"], "description": "查询模式: by_gene=查特定基因变异, by_pathway=查通路所有基因, by_prs=计算多基因风险评分"},
+      "targets": {"type": "array", "items": {"type": "string"}, "description": "目标列表: by_gene时为基因名(如BRCA1), by_pathway时为通路名(如PI3K-AKT), by_prs时为疾病名(如breast_cancer)"}
+    }, "required": ["query_mode", "targets"]}
+  }},
+  {"type": "function", "function": {
+    "name": "query_proteomics",
+    "description": "查询患者特定蛋白质的Olink表达水平。返回z-score和临床解读。cost=0.05。注意：仅约10%的UKB参与者有蛋白质组数据，缺失时会返回提示。",
+    "parameters": {"type": "object", "properties": {
+      "proteins": {"type": "array", "items": {"type": "string"}, "description": "蛋白质名称列表（如 IL-6, CRP, ApoB）"},
+      "return_format": {"type": "string", "enum": ["z_score", "percentile", "raw"], "description": "返回格式", "default": "z_score"}
+    }, "required": ["proteins"]}
+  }},
+  {"type": "function", "function": {
+    "name": "query_imaging_detail",
+    "description": "查询患者影像数据的详细特征（已提取的特征或报告）。cost=0.1。",
+    "parameters": {"type": "object", "properties": {
+      "modality": {"type": "string", "enum": ["brain_mri", "cardiac_mri", "dxa", "retinal", "ultrasound", "abdominal_mri"], "description": "影像模态"}
+    }, "required": ["modality"]}
+  }},
+  {"type": "function", "function": {
+    "name": "gene_protein_integration",
+    "description": "对已检索的基因变异和蛋白质数据进行整合分析（如eQTL效应方向一致性、通路一致性）。需先调用 query_genetic_risk 和 query_proteomics。cost=0.5。",
+    "parameters": {"type": "object", "properties": {}}
+  }},
+  {"type": "function", "function": {
+    "name": "recall_similar_cases",
+    "description": "从情景记忆(L4)中检索相似病例的处理经验。不使用向量库，基于疾病类型和特征标签的规则匹配。cost=0.01。建议在决定是否调用高成本工具前先检索经验。",
+    "parameters": {"type": "object", "properties": {
+      "disease": {"type": "string", "description": "疾病名称（如 breast_cancer）"},
+      "key_features": {"type": "array", "items": {"type": "string"}, "description": "关键特征标签（如 family_history, early_onset, male_50s）"}
+    }, "required": ["disease"]}
+  }},
+  {"type": "function", "function": {
+    "name": "submit_diagnosis",
+    "description": "提交最终诊断/预测结果。会自动记录本次推理的完整工具调用链和证据。提交后任务结束。",
+    "parameters": {"type": "object", "properties": {
+      "diagnosis": {"type": "string", "description": "诊断结论"},
+      "confidence": {"type": "number", "description": "置信度 (0-1)"},
+      "evidence_summary": {"type": "string", "description": "支持诊断的关键证据摘要"},
+      "tools_contributed": {"type": "array", "items": {"type": "string"}, "description": "对诊断有实际增量贡献的工具名列表"}
+    }, "required": ["diagnosis", "confidence", "evidence_summary"]}
+  }},
+  {"type": "function", "function": {
+    "name": "write_case_reflection",
+    "description": "对当前病例进行反思总结，写入情景记忆(L4)。应在 submit_diagnosis 之前调用。记录哪些工具有用、哪些无增量价值、学到了什么经验。",
+    "parameters": {"type": "object", "properties": {
+      "patient_profile": {"type": "string", "description": "患者简况（如 F/52/BMI24/family_hx+）"},
+      "tools_useful": {"type": "object", "description": "各工具是否有增量价值: {工具名: true/false}"},
+      "key_lesson": {"type": "string", "description": "本案学到的关键经验教训"},
+      "confidence_before_tools": {"type": "number", "description": "调用工具前的置信度"},
+      "confidence_after_tools": {"type": "number", "description": "调用工具后的置信度"},
+      "tags": {"type": "array", "items": {"type": "string"}, "description": "病例特征标签，用于后续检索"}
+    }, "required": ["tools_useful", "key_lesson", "confidence_before_tools", "confidence_after_tools"]}
+  }},
+  {"type": "function", "function": {
+    "name": "distill_experience",
+    "description": "从情景记忆(L4)中蒸馏出策略统计，更新 disease_strategy.json。通常在积累足够病例后由系统提示触发。",
+    "parameters": {"type": "object", "properties": {}}
+  }},
+  {"type": "function", "function": {
+    "name": "web_search",
+    "description": "联网搜索工具。通过API查询PubMed/Ensembl/UniProt/ClinVar/DuckDuckGo。普通模式可用。自主探索模式下空结果会自动接管浏览器搜索。cost=0.01。适用：查文献、基因/蛋白功能、临床指南、验证假设。",
+    "parameters": {"type": "object", "properties": {
+      "query": {"type": "string", "description": "搜索关键词（如 BRCA1 breast cancer risk, APOE Alzheimer, IL-6 inflammation）"},
+      "source": {"type": "string", "enum": ["pubmed", "gene", "protein", "clinvar", "google"], "description": "搜索源: pubmed=医学文献, gene=基因信息(Ensembl), protein=蛋白信息(UniProt), clinvar=变异致病性, google=通用搜索(实际用DuckDuckGo)", "default": "pubmed"},
+      "max_results": {"type": "integer", "description": "最大返回条数", "default": 5}
+    }, "required": ["query"]}
+  }},
+  {"type": "function", "function": {
+    "name": "browse_and_learn",
+    "description": "自主浏览网页学习诊断知识。可指定URL直接访问，或提供topic自动搜索学习资源。获取内容后你需要分析并决定是否将有价值的知识写入记忆(L1/L2/L3)。cost=0.05。适用：遇到不熟悉的疾病、需要学习新的诊断标准、查阅最新指南、自主扩展知识库。",
+    "parameters": {"type": "object", "properties": {
+      "url": {"type": "string", "description": "要访问的网页URL（如 https://www.ncbi.nlm.nih.gov/books/NBK1247/）"},
+      "topic": {"type": "string", "description": "学习主题（如 hereditary breast cancer diagnosis, APOE genotyping guidelines）。不提供url时，系统会自动搜索相关资源"},
+      "learn_goal": {"type": "string", "description": "学习目标，帮助你聚焦提取（如 诊断标准、风险分层流程、推荐的基因panel）"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "browser_navigate",
+    "description": "用 Playwright 浏览器打开指定 URL。返回页面标题和可交互元素列表（链接/按钮），每个元素带有索引号。适用于深度阅读搜索结果、访问权威网站。cost=0.01。",
+    "parameters": {"type": "object", "properties": {
+      "url": {"type": "string", "description": "要访问的网页 URL"}
+    }, "required": ["url"]}
+  }},
+  {"type": "function", "function": {
+    "name": "browser_click",
+    "description": "点击当前浏览器页面上的元素。使用 browser_navigate 返回的元素索引（如 [3]）或 CSS 选择器。点击后返回新页面的标题和可交互元素列表。cost=0.01。",
+    "parameters": {"type": "object", "properties": {
+      "selector": {"type": "string", "description": "元素索引（如 [3]）或 CSS 选择器（如 a.article-link）"}
+    }, "required": ["selector"]}
+  }},
+  {"type": "function", "function": {
+    "name": "browser_get_content",
+    "description": "获取当前浏览器页面的文本内容（自动去除导航栏等噪音，限制5000字符）。先用 browser_navigate 打开页面，再用此工具提取正文。适用于深度阅读文章、指南全文。cost=0.01。",
+    "parameters": {"type": "object", "properties": {
+      "selector": {"type": "string", "description": "可选 CSS 选择器，只提取特定区域（如 article, main, .content）"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "browser_search",
+    "description": "用 Playwright 浏览器执行 Google 搜索，返回结构化结果列表（标题+摘要+URL）。当 web_search API 结果为空或质量低时使用。cost=0.02。",
+    "parameters": {"type": "object", "properties": {
+      "query": {"type": "string", "description": "搜索关键词"}
+    }, "required": ["query"]}
+  }},
+  {"type": "function", "function": {
+    "name": "browser_back",
+    "description": "浏览器后退到上一页。cost=0.01。",
+    "parameters": {"type": "object", "properties": {}}
+  }},
+  {"type": "function", "function": {
+    "name": "browser_scroll",
+    "description": "滚动当前浏览器页面。cost=0.01。",
+    "parameters": {"type": "object", "properties": {
+      "direction": {"type": "string", "enum": ["up", "down"], "description": "滚动方向", "default": "down"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "browser_screenshot",
+    "description": "通过 CDP 桥截取当前浏览器页面截图（PNG），保存到本地文件。需已安装 tmwd_cdp_bridge 扩展（见 web_setup_sop）。无需前台，后台标签页也可截图。适用：验证码识别、页面视觉分析、保存网页快照。cost=0.02。",
+    "parameters": {"type": "object", "properties": {
+      "save_path": {"type": "string", "description": "截图保存路径（如 temp/screenshot.png），默认自动生成带时间戳的文件名"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "cdp_command",
+    "description": "通用 Chrome DevTools Protocol 命令执行（高级工具）。可用于 isTrusted 事件派发（绕过网页安全检测）、DOM 操作、网络拦截等。支持单命令和 batch 模式。需已安装 tmwd_cdp_bridge 扩展。cost=0.02。常见场景：Input.dispatchMouseEvent（真实点击）、DOM.setFileInputFiles（文件上传）、Network.enable（监控请求）。",
+    "parameters": {"type": "object", "properties": {
+      "method": {"type": "string", "description": "CDP 方法名（如 Page.captureScreenshot, Input.dispatchMouseEvent, DOM.getDocument）"},
+      "params": {"type": "object", "description": "CDP 方法参数"},
+      "batch": {"type": "boolean", "description": "是否使用 batch 模式（一次发送多条命令）", "default": false},
+      "commands": {"type": "array", "description": "batch 模式的命令列表，每条 {cmd:'cdp', method:'...', params:{...}}。支持 $N.path 引用前序结果", "items": {"type": "object"}}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "browser_cookies",
+    "description": "获取当前浏览器页面的所有 Cookie（含 HttpOnly、Secure、Partitioned 标记）。需已安装 tmwd_cdp_bridge 扩展。适用：调试登录态、提取 session token。cost=0.01。",
+    "parameters": {"type": "object", "properties": {}}
+  }},
+  {"type": "function", "function": {
+    "name": "browser_tabs",
+    "description": "通过 CDP 桥列出所有浏览器标签页或切换到指定标签。返回每个标签的 id/url/title/active 状态。需已安装 tmwd_cdp_bridge 扩展。cost=0.01。",
+    "parameters": {"type": "object", "properties": {
+      "action": {"type": "string", "enum": ["list", "switch"], "description": "操作类型: list=列出所有标签, switch=切换到指定标签", "default": "list"},
+      "tab_id": {"type": "integer", "description": "切换目标标签的 ID（仅 action=switch 时需要）"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "phone_control",
+    "description": "控制通过ADB连接的Android手机。支持截图、点击、滑动、输入文字、获取UI元素、启动App等操作。可用于操控手机App（如点外卖、查看健康数据等）。每次操作后建议用ui_dump或screenshot确认结果。cost=0.02。使用前需先check_connection确认手机已连接。",
+    "parameters": {"type": "object", "properties": {
+      "action": {"type": "string", "enum": ["check_connection", "screenshot", "tap", "swipe", "input_text", "press_key", "launch_app", "ui_dump", "scroll_down", "scroll_up", "current_app", "list_apps"], "description": "要执行的操作类型"},
+      "x": {"type": "number", "description": "点击/滑动起点的x坐标（像素）"},
+      "y": {"type": "number", "description": "点击/滑动起点的y坐标（像素）"},
+      "x2": {"type": "number", "description": "滑动终点的x坐标"},
+      "y2": {"type": "number", "description": "滑动终点的y坐标"},
+      "text": {"type": "string", "description": "要输入的文字内容"},
+      "key": {"type": "string", "description": "要按的键: back/home/recent/enter/delete"},
+      "app": {"type": "string", "description": "要启动的App名称(如'美团外卖','微信')或包名"},
+      "keyword": {"type": "string", "description": "ui_dump时过滤含该关键词的元素"},
+      "clickable_only": {"type": "boolean", "description": "ui_dump时是否只显示可点击元素", "default": false}
+    }, "required": ["action"]}
+  }},
+  {"type": "function", "function": {
+    "name": "phone_screen_analyze",
+    "description": "截取手机屏幕截图并用AI视觉能力分析当前界面内容。返回界面描述、可操作元素、建议下一步。适用于复杂界面（图片多、UI元素不易通过ui_dump获取时）。cost=0.1。需手机已通过ADB连接。",
+    "parameters": {"type": "object", "properties": {
+      "question": {"type": "string", "description": "你想了解屏幕上的什么内容（如'当前有哪些商品可选？价格分别是多少？'）", "default": "描述当前手机屏幕内容，列出可操作的按钮和文字"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "get_location",
+    "description": "获取用户当前地理位置。通过启动地图应用并读取位置信息。cost=0.02。需手机已通过ADB连接。",
+    "parameters": {"type": "object", "properties": {
+      "map_app": {"type": "string", "enum": ["amap", "baidumap"], "description": "地图应用选择: amap=高德地图, baidumap=百度地图", "default": "amap"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "search_hospital",
+    "description": "搜索附近医院。基于用户位置和科室需求，搜索并推荐附近的医院。cost=0.05。",
+    "parameters": {"type": "object", "properties": {
+      "department": {"type": "string", "description": "就诊科室（如'内科'、'外科'、'神经科'等）"},
+      "location": {"type": "string", "description": "用户当前位置（如'北京市海淀区'）"},
+      "radius": {"type": "number", "description": "搜索半径（公里）", "default": 5}
+    }, "required": ["department"]}
+  }},
+  {"type": "function", "function": {
+    "name": "plan_route",
+    "description": "规划从当前位置到医院的路线。返回详细的出行方案。cost=0.03。",
+    "parameters": {"type": "object", "properties": {
+      "hospital_name": {"type": "string", "description": "医院名称"},
+      "hospital_address": {"type": "string", "description": "医院地址"},
+      "mode": {"type": "string", "enum": ["driving", "transit", "walking"], "description": "出行方式", "default": "transit"}
+    }, "required": ["hospital_name", "hospital_address"]}
+  }},
+  {"type": "function", "function": {
+    "name": "book_taxi",
+    "description": "帮助用户叫车。启动打车出行应用并设置目的地。cost=0.05。需手机已通过ADB连接。",
+    "parameters": {"type": "object", "properties": {
+      "destination": {"type": "string", "description": "目的地（医院名称）"},
+      "destination_address": {"type": "string", "description": "目的地地址"}
+    }, "required": ["destination"]}
+  }}
+]

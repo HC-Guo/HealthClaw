@@ -1,0 +1,80 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "import_wearable_data",
+      "description": "Import wearable data from a local export directory or GPX file, normalize it through adapters, and write it into the local wearable store. Phase 1 supports Xiaomi export directories, Huawei Health export directories, and GPX files.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "eid": {"type": "string", "description": "Patient identifier"},
+          "source_type": {
+            "type": "string",
+            "enum": ["xiaomi_export_dir", "huawei_export_dir", "gpx_file", "huawei_api", "xiaomi_api"],
+            "description": "Upstream wearable source. Local export adapters support Xiaomi and Huawei export directories; API adapters are placeholders in Phase 1."
+          },
+          "path": {"type": "string", "description": "Absolute local directory path or file path"}
+        },
+        "required": ["eid", "source_type", "path"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "query_wearable_trend",
+      "description": "Query wearable trends from the unified local store for 7d/30d/90d windows. Returns structured aggregates, baselines, quality, and exercise summaries.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "eid": {"type": "string", "description": "Patient identifier. Optional if load_patient already set the current patient."},
+          "period": {"type": "string", "enum": ["7d", "30d", "90d"], "default": "30d"}
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "summarize_wearable_status",
+      "description": "Generate a high-level summary of cardiovascular, metabolic, sleep, or general wearable status from trend features.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "eid": {"type": "string"},
+          "period": {"type": "string", "enum": ["7d", "30d", "90d"], "default": "30d"},
+          "focus": {"type": "string", "enum": ["cardiovascular", "metabolic", "sleep", "general"], "default": "general"}
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "detect_wearable_anomalies",
+      "description": "Detect wearable anomalies from recent daily summaries using persistent baseline deviation and absolute thresholds.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "eid": {"type": "string"},
+          "lookback_days": {"type": "integer", "default": 30},
+          "sensitivity": {"type": "string", "enum": ["low", "medium", "high"], "default": "medium"}
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "integrate_clinical_wearable",
+      "description": "Integrate clinical evidence and wearable trends to produce rule-based risk signals and lifestyle recommendations. Use after load_patient and query_wearable_trend or summarize_wearable_status.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "eid": {"type": "string"},
+          "period": {"type": "string", "enum": ["7d", "30d", "90d"], "default": "30d"}
+        }
+      }
+    }
+  }
+]

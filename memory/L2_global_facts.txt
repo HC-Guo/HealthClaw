@@ -1,0 +1,39 @@
+## [UKB_DATA_PATHS]
+phenotype_file: (待配置)
+genotype_dir: (待配置)
+proteomics_file: (待配置)
+imaging_dir: (待配置)
+prs_weights_dir: (待配置)
+annotation_db: (待配置)
+
+## [POPULATION_STATS]
+total_participants: 502411
+with_proteomics: ~53000 (Olink)
+with_wgs: ~200000
+with_brain_mri: ~50000
+ancestry: EUR~472K, SAS~10K, AFR~8K, EAS~3K, Other~9K
+
+## [ANALYSIS_CONFIGS]
+prs_method: weighted_sum
+protein_normalization: rank_inverse_normal
+variant_annotation: ClinVar + VEP
+
+## [HEALTH_SERVICE_CONFIG]
+user_data_dir: memory/user_data
+evidence_citation_level: standard
+audit_trail_enabled: true
+sop_auto_learn_min_turns: 6
+auto_extract_min_turns: 4
+lifestyle_log_retention_days: 90
+conversation_log_max_entries: 500
+
+## [EVIDENCE_SOURCES]
+pubmed: https://pubmed.ncbi.nlm.nih.gov/ (文献检索, T4)
+genreviews: https://www.ncbi.nlm.nih.gov/books/NBK1116/ (遗传病综述, T2)
+uptodate: https://www.uptodate.com/ (临床决策, T1-T2, 需订阅)
+nice_guidelines: https://www.nice.org.uk/guidance (英国指南, T1)
+who_guidelines: https://www.who.int/publications (WHO指南, T1)
+nmpa_labels: 国家药监局药品说明书 (T3)
+nhsa_catalog: 国家医保药品目录 (T3, 年度更新)
+icd10_standard: ICD-10 国际疾病分类 (T3)
+pharmgkb: https://www.pharmgkb.org/ (药物基因组, T2-T4)

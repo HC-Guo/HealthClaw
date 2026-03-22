@@ -1,0 +1,8 @@
+[theme]
+# 医疗/信任感：青绿主色 + 冷灰背景
+primaryColor = "#0d9488"
+backgroundColor = "#f4f7f9"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#1e293b"
+font = "sans serif"
+base = "light"

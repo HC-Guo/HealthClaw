@@ -1,0 +1,44 @@
+[
+  {"type": "function", "function": {
+    "name": "blast_search",
+    "description": "BLAST 序列相似性搜索，找同源基因/蛋白。调用 NCBI BLAST API。适用：验证基因/蛋白身份、跨物种比对。详见 memory/L3_sops/bioinformatics_tools_sop.md。cost=0.1。",
+    "parameters": {"type": "object", "properties": {
+      "query": {"type": "string", "description": "序列字符串或单条 FASTA（可含 >id 行）"},
+      "program": {"type": "string", "enum": ["blastn", "blastp", "blastx", "tblastn", "tblastx"], "description": "BLAST 程序", "default": "blastp"},
+      "database": {"type": "string", "description": "数据库，如 nr, swissprot, nt", "default": "swissprot"},
+      "evalue": {"type": "number", "description": "E-value 阈值", "default": 1e-5}
+    }, "required": ["query"]}
+  }},
+  {"type": "function", "function": {
+    "name": "david_enrichment",
+    "description": "DAVID 基因列表富集分析（通路/GO）。需在 DAVID 官网注册邮箱后使用 API；未配置时返回使用说明与 R 包建议。详见 L3 bioinformatics_tools_sop。cost=0.05。",
+    "parameters": {"type": "object", "properties": {
+      "gene_ids": {"type": "array", "items": {"type": "string"}, "description": "基因 ID 列表（如 ENTREZ_GENE_ID）"},
+      "id_type": {"type": "string", "description": "ID 类型", "default": "ENTREZ_GENE_ID"},
+      "species": {"type": "string", "description": "物种", "default": "human"},
+      "email": {"type": "string", "description": "DAVID 注册邮箱（可选，未配置则返回说明）"}
+    }, "required": ["gene_ids"]}
+  }},
+  {"type": "function", "function": {
+    "name": "interpro_scan",
+    "description": "InterProScan 蛋白结构域/功能注释，调用 EBI REST。适用：蛋白序列功能预测、GO/Pathway 推断。详见 L3 bioinformatics_tools_sop。cost=0.15。",
+    "parameters": {"type": "object", "properties": {
+      "sequences": {"type": "string", "description": "FASTA 格式序列（含 >id 行）或序列列表"},
+      "appl": {"type": "string", "description": "可选应用，如 Pfam, ProSite"},
+      "email": {"type": "string", "description": "EBI 要求提供的联系邮箱，默认 agent@local"}
+    }, "required": ["sequences"]}
+  }},
+  {"type": "function", "function": {
+    "name": "run_bioinfo_cli",
+    "description": "运行生信命令行工具：bwa/hisat2/star/prokka/spades。需本机已安装并配置 PATH。DESeq2/AlphaFold 等建议用 code_run 按 L3 SOP 执行。详见 memory/L3_sops/bioinformatics_tools_sop.md。cost=0.2。",
+    "parameters": {"type": "object", "properties": {
+      "tool": {"type": "string", "enum": ["bwa", "hisat2", "star", "prokka", "spades"], "description": "工具名"},
+      "input_path": {"type": "string", "description": "主输入文件路径（FASTA/FQ 等）"},
+      "input_path2": {"type": "string", "description": "双端测序第二端路径（可选）"},
+      "output_dir": {"type": "string", "description": "输出目录（可选，默认临时目录）"},
+      "reference_index": {"type": "string", "description": "比对工具参考基因组索引前缀（bwa/hisat2/star 必填）"},
+      "extra_args": {"type": "array", "items": {"type": "string"}, "description": "额外命令行参数"},
+      "timeout": {"type": "integer", "description": "超时秒数", "default": 3600}
+    }, "required": ["tool"]}
+  }}
+]

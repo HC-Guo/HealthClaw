@@ -1,0 +1,198 @@
+[
+  {"type": "function", "function": {
+    "name": "load_user_profile",
+    "description": "加载当前用户的健康画像（基本信息、家族史、过敏史、慢病、用药、健康目标）。首次使用时自动创建空画像。",
+    "parameters": {"type": "object", "properties": {}}
+  }},
+  {"type": "function", "function": {
+    "name": "update_user_profile",
+    "description": "更新用户健康画像的某个字段。当用户提到新的过敏信息、确诊慢病、更换用药、设定健康目标等，应及时调用。",
+    "parameters": {"type": "object", "properties": {
+      "field": {"type": "string", "enum": ["basic_info","family_history","allergies","chronic_diseases","medications","health_goals","preferences"], "description": "要更新的字段"},
+      "action": {"type": "string", "enum": ["set","append","remove"], "description": "操作类型: set=覆盖, append=追加, remove=移除"},
+      "data": {"type": "object", "description": "要更新的数据内容"}
+    }, "required": ["field","action","data"]}
+  }},
+  {"type": "function", "function": {
+    "name": "parse_checkup_report",
+    "description": "解析用户上传或粘贴的体检报告，提取结构化健康指标并存入历史记录。支持文本和图片（利用多模态能力）。解析后自动保存到用户体检历史。",
+    "parameters": {"type": "object", "properties": {
+      "report_text": {"type": "string", "description": "用户粘贴的体检报告文本内容"},
+      "report_date": {"type": "string", "description": "体检日期 (YYYY-MM-DD)"},
+      "hospital": {"type": "string", "description": "体检机构名称"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "interpret_indicator",
+    "description": "解读特定健康指标：正常范围、异常含义、可能原因、生活建议。会结合用户画像（年龄/性别/慢病/用药）给出个性化解读。",
+    "parameters": {"type": "object", "properties": {
+      "indicator": {"type": "string", "description": "指标名称（如 空腹血糖、低密度脂蛋白LDL-C、谷丙转氨酶ALT）"},
+      "value": {"type": "number", "description": "指标数值"},
+      "unit": {"type": "string", "description": "单位（如 mmol/L, U/L, mg/dL）"}
+    }, "required": ["indicator"]}
+  }},
+  {"type": "function", "function": {
+    "name": "compare_checkup_history",
+    "description": "对比用户历次体检数据，发现趋势变化（恶化↑/改善↓/稳定→），标注需要关注的指标。",
+    "parameters": {"type": "object", "properties": {
+      "indicators": {"type": "array", "items": {"type": "string"}, "description": "要对比的指标列表（为空则对比所有共有指标）"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "get_health_timeline",
+    "description": "获取某个健康指标的历史时间线数据，用于分析长期变化趋势。",
+    "parameters": {"type": "object", "properties": {
+      "indicator": {"type": "string", "description": "指标名称"},
+      "period": {"type": "string", "enum": ["3m","6m","1y","3y","all"], "default": "1y", "description": "时间范围"}
+    }, "required": ["indicator"]}
+  }},
+  {"type": "function", "function": {
+    "name": "manage_medication",
+    "description": "管理用户的用药记录：添加新药、停用药物、查看当前用药列表、查看某药详情。",
+    "parameters": {"type": "object", "properties": {
+      "action": {"type": "string", "enum": ["add","stop","list","detail"], "description": "操作类型"},
+      "drug_name": {"type": "string", "description": "药物名称"},
+      "dosage": {"type": "string", "description": "剂量（如 500mg）"},
+      "frequency": {"type": "string", "description": "频率（如 每日两次）"},
+      "reason": {"type": "string", "description": "用药原因或停药原因"}
+    }, "required": ["action"]}
+  }},
+  {"type": "function", "function": {
+    "name": "check_drug_interaction",
+    "description": "检查用户当前用药列表中是否存在药物相互作用风险。也可指定拟新增药物与现有药物的交互检查。",
+    "parameters": {"type": "object", "properties": {
+      "new_drug": {"type": "string", "description": "拟新增的药物名称（可选，为空则检查现有药物间交互）"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "set_health_reminder",
+    "description": "设置健康相关提醒（用药、复查、体检、疫苗、运动等）。",
+    "parameters": {"type": "object", "properties": {
+      "type": {"type": "string", "enum": ["medication","checkup","vaccine","exercise","custom"], "description": "提醒类型"},
+      "title": {"type": "string", "description": "提醒标题"},
+      "schedule": {"type": "string", "description": "调度规则（如 daily 08:00, weekly Mon, 2025-12-01）"},
+      "note": {"type": "string", "description": "备注信息"}
+    }, "required": ["type","title","schedule"]}
+  }},
+  {"type": "function", "function": {
+    "name": "list_reminders",
+    "description": "列出用户的健康提醒计划。",
+    "parameters": {"type": "object", "properties": {
+      "status": {"type": "string", "enum": ["pending","done","all"], "default": "pending"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "log_lifestyle",
+    "description": "记录用户的饮食、运动、睡眠、体重、血压、血糖等日常健康数据。",
+    "parameters": {"type": "object", "properties": {
+      "category": {"type": "string", "enum": ["diet","exercise","sleep","weight","blood_pressure","blood_sugar"], "description": "记录类别"},
+      "data": {"type": "object", "description": "记录内容，如 {\"meal\":\"午餐\", \"items\":[\"米饭\",\"青菜炒肉\"], \"calories\":650}"},
+      "timestamp": {"type": "string", "description": "记录时间（默认当前时间）"}
+    }, "required": ["category","data"]}
+  }},
+  {"type": "function", "function": {
+    "name": "analyze_lifestyle",
+    "description": "分析用户近期的生活方式数据（饮食/运动/睡眠），给出评估和改善建议。",
+    "parameters": {"type": "object", "properties": {
+      "period": {"type": "string", "enum": ["1w","2w","1m","3m"], "default": "1w", "description": "分析时间范围"},
+      "focus": {"type": "string", "enum": ["diet","exercise","sleep","overall"], "default": "overall", "description": "重点分析方向"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "health_risk_screening",
+    "description": "基于用户画像（年龄、性别、家族史、生活方式、体检指标）进行常见慢病风险初筛。结果仅供参考。",
+    "parameters": {"type": "object", "properties": {
+      "focus_diseases": {"type": "array", "items": {"type": "string"}, "description": "重点筛查的疾病（为空则全面筛查）"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "medication_review",
+    "description": "对用户当前用药进行全面审查：药物相互作用(DDI)、药物-疾病禁忌、过敏交叉反应、特殊人群禁忌（孕哺/老年Beers标准）。结合用户画像和最新指标给出分级风险报告。当用户新增用药或问'这些药能一起吃吗'时调用。参考 medication_review_sop。",
+    "parameters": {"type": "object", "properties": {
+      "drugs": {"type": "array", "items": {"type": "string"}, "description": "当前用药列表（为空则自动从用药记录加载）"},
+      "new_drug": {"type": "string", "description": "拟新增的药物名称（可选）"},
+      "check_scope": {"type": "string", "enum": ["full","ddi_only","allergy_only","dosage_only"], "default": "full", "description": "检查范围: full=全面, ddi_only=仅交互, allergy_only=仅过敏, dosage_only=仅剂量"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "extract_medical_record",
+    "description": "将非结构化的病历文本（门诊/住院/出院小结）抽取为标准结构化JSON：主诉、现病史、既往史、查体、辅助检查、诊断、用药等。支持中文病历。用于病历质控和ICD编码的前置步骤。参考 medical_record_qc_sop。",
+    "parameters": {"type": "object", "properties": {
+      "raw_text": {"type": "string", "description": "原始病历文本"},
+      "record_type": {"type": "string", "enum": ["inpatient","outpatient","discharge","emergency","other"], "default": "inpatient", "description": "病历类型"}
+    }, "required": ["raw_text"]}
+  }},
+  {"type": "function", "function": {
+    "name": "check_medical_record",
+    "description": "对结构化病历进行智能质控：检查主诉-诊断一致性、时间逻辑、必要字段完整性、过敏药禁忌、诊断证据充分性。输出分级问题列表和质控评分。参考 medical_record_qc_sop。",
+    "parameters": {"type": "object", "properties": {
+      "structured_record": {"type": "object", "description": "extract_medical_record 输出的结构化病历JSON"},
+      "check_level": {"type": "string", "enum": ["strict","standard","basic"], "default": "standard", "description": "质控严格程度: strict=三甲标准, standard=常规, basic=仅查致命错误"}
+    }, "required": ["structured_record"]}
+  }},
+  {"type": "function", "function": {
+    "name": "suggest_icd_codes",
+    "description": "为病历中的诊断和手术操作推荐ICD-10编码。每个诊断给出前3个候选编码、置信度和病历中的证据引用。低置信度时自动搜索确认。参考 icd_coding_sop。",
+    "parameters": {"type": "object", "properties": {
+      "diagnoses": {"type": "array", "items": {"type": "string"}, "description": "诊断列表（第一个为主诊断）"},
+      "procedures": {"type": "array", "items": {"type": "string"}, "description": "手术/操作列表"},
+      "icd_version": {"type": "string", "enum": ["ICD-10","ICD-10-CM","ICD-11"], "default": "ICD-10", "description": "ICD版本"}
+    }, "required": ["diagnoses"]}
+  }},
+  {"type": "function", "function": {
+    "name": "validate_icd_combination",
+    "description": "检查ICD编码组合是否符合编码规则：主诊断选择原则、合并编码规范、排除码/包含码、手术-诊断一致性、编码特异性。参考 icd_coding_sop。",
+    "parameters": {"type": "object", "properties": {
+      "main_diagnosis_code": {"type": "string", "description": "主诊断ICD编码"},
+      "other_codes": {"type": "array", "items": {"type": "string"}, "description": "其他诊断ICD编码列表"},
+      "procedure_codes": {"type": "array", "items": {"type": "string"}, "description": "手术操作编码列表"}
+    }, "required": ["main_diagnosis_code"]}
+  }},
+  {"type": "function", "function": {
+    "name": "check_pathway_compliance",
+    "description": "对诊疗方案进行临床路径偏差检查和/或医保预审。逐项比对路径要求与实际执行，输出偏差报告（含条款引用和证据分级）。参考 clinical_pathway_compliance_sop + evidence_grading_framework_sop。",
+    "parameters": {"type": "object", "properties": {
+      "diagnoses": {"type": "array", "items": {"type": "string"}, "description": "诊断列表（第一个为主诊断）"},
+      "treatment_plan": {"type": "object", "description": "诊疗方案: {medications:[], procedures:[], examinations:[], hospital_days:int}"},
+      "check_type": {"type": "string", "enum": ["pathway","insurance","both"], "default": "both", "description": "审查类型: pathway=路径偏差, insurance=医保预审, both=全面审查"},
+      "pathway_version": {"type": "string", "description": "指定临床路径版本(可选，为空则自动匹配最新版)"}
+    }, "required": ["diagnoses", "treatment_plan"]}
+  }},
+  {"type": "function", "function": {
+    "name": "review_compliance_material",
+    "description": "审阅医学事务/学术推广/培训材料，逐条验证医学声明的准确性和引用完整性。自动进行证据分级(T1-T6)、合规性检查、缺失引用补全。参考 compliance_review_sop + evidence_grading_framework_sop。",
+    "parameters": {"type": "object", "properties": {
+      "text": {"type": "string", "description": "待审阅的材料文本"},
+      "material_type": {"type": "string", "enum": ["academic","promotion","training","regulation","other"], "default": "academic", "description": "材料类型"},
+      "review_scope": {"type": "string", "enum": ["full","claims_only","references_only"], "default": "full", "description": "审阅范围: full=全面, claims_only=仅声明, references_only=仅引用"}
+    }, "required": ["text"]}
+  }},
+  {"type": "function", "function": {
+    "name": "record_evidence_citation",
+    "description": "将一条证据引用记录到审计链。当 Agent 在输出结论时引用了证据来源，应调用此工具记录以支持审计回放。参考 evidence_grading_framework_sop §四。",
+    "parameters": {"type": "object", "properties": {
+      "conclusion": {"type": "string", "description": "得出的结论（≤200字）"},
+      "evidence_tier": {"type": "string", "enum": ["T1","T2","T3","T4","T5","T6"], "description": "证据等级"},
+      "source": {"type": "string", "description": "来源描述（指南名称+版本+章节 / PMID / 说明书条目等）"},
+      "citation_snippet": {"type": "string", "description": "原文引用片段（≤200字，可选）"},
+      "sop_used": {"type": "string", "description": "引用的SOP名称（可选）"}
+    }, "required": ["conclusion", "evidence_tier", "source"]}
+  }},
+  {"type": "function", "function": {
+    "name": "parse_imaging_report",
+    "description": "将影像检查报告（CT/MRI/超声/X光/PET-CT/内镜）文本结构化抽取：检查类型、部位、发现列表（位置+描述+大小+特征）、结论、建议。每个发现按严重程度分级(🔴紧急/🟠尽快/🟡随访/🟢无需处理)并翻译为通俗语言。参考 imaging_report_interpretation_sop。",
+    "parameters": {"type": "object", "properties": {
+      "report_text": {"type": "string", "description": "原始影像报告文本"},
+      "modality": {"type": "string", "enum": ["CT","MRI","US","XR","PET","endoscopy","other"], "default": "CT", "description": "检查类型: CT/MRI/US(超声)/XR(X光)/PET/endoscopy(内镜)"}
+    }, "required": ["report_text"]}
+  }},
+  {"type": "function", "function": {
+    "name": "compare_imaging_reports",
+    "description": "对比当前影像报告与既往报告，分析每个病灶的大小变化、形态变化、新发/消失病灶，给出整体趋势评估（好转/稳定/进展）。参考 imaging_report_interpretation_sop。",
+    "parameters": {"type": "object", "properties": {
+      "current_report": {"type": "string", "description": "当前影像报告文本或结构化JSON"},
+      "prior_report": {"type": "string", "description": "既往影像报告文本或结构化JSON"},
+      "focus_findings": {"type": "array", "items": {"type": "string"}, "description": "重点关注的发现（如'右肺结节'），为空则全面对比"}
+    }, "required": ["current_report", "prior_report"]}
+  }}
+]

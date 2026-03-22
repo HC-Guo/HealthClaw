@@ -1,0 +1,22 @@
+/* HealthClaw：轻量全局样式，尽量依赖 Streamlit 主题变量 */
+
+.main .block-container {
+  padding-top: 1.5rem;
+  padding-bottom: 2rem;
+  max-width: 56rem;
+}
+
+/* 主标题与正文区留白 */
+h1 {
+  margin-bottom: 0.35rem;
+  letter-spacing: -0.02em;
+}
+
+/* 带 border 的容器（如一键健康分析表单）略圆角 */
+[data-testid="stVerticalBlockBorderWrapper"] {
+  border-radius: 0.75rem;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"] > div {
+  border-radius: 0.75rem;
+}

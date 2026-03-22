@@ -1,0 +1,166 @@
+# HealthClaw 知识索引 (L1)
+
+## [HIGH-FREQ MAPPING]
+乳腺癌|breast_cancer→gene:BRCA1/2,PALB2|prot:CA15-3|sop:breast_cancer_sop|gene建议:always
+冠心病|CAD→gene:9p21,LPA,PCSK9|prot:ApoB,Lp(a),IL-6|prs:有效|sop:cardiovascular_sop
+2型糖尿病|T2D→gene:TCF7L2|prot:HbA1c,insulin|prs:有效|sop:diabetes_sop
+阿尔茨海默|AD→gene:APOE(必查)|prot:NFL,GFAP|prs:中等|sop:alzheimer_sop
+房颤|AF→gene:PITX2,4q25|prot:NT-proBNP|prs:有效|sop:atrial_fibrillation_sop|gene建议:家族史/早发(<60岁)时查
+结直肠癌|CRC→gene:MLH1,MSH2,MSH6,PMS2,EPCAM|prot:CEA|sop:colorectal_cancer_sop|gene建议:家族史必查
+
+## [MID-FREQ MAPPING]
+卵巢癌|ovarian_cancer→gene:BRCA1/2(高外显),RAD51C/D/BRIP1(中等),MLH1/MSH2(Lynch)|prot:CA-125/MUC16,HE4/WFDC2|sop:ovarian_cancer_sop|gene建议:家族史/早发(<50岁)/AJ人群必查
+→ BRCA1:终生风险39-44%;BRCA2:11-17%;Lynch:20%;AJ人群携带率36-41%
+肺癌|lung_cancer→gene:TP53,EGFR,KRAS,BRCA2,CHEK2|prot:CEA,CYFRA21-1|sop:lung_cancer_sop|gene建议:家族史/早发(<50岁)时查
+前列腺癌|prostate_cancer→gene:BRCA2,HOXB13,MSH2,ATM,PALB2,CHEK2|prot:PSA,FOLH1|sop:prostate_cancer_sop|gene建议:家族史/转移性/高危必查
+眼科遗传病|ophthalmic_diseases→gene:RB1(视网膜母细胞瘤),PAX6(无虹膜),RPE65/ABCA4(视网膜营养不良),MYOC/OPTN(青光眼)|prot:VEGF|sop:ophthalmic_diseases_sop|gene建议:早发/家族史时查
+MASLD|masld→gene:PNPLA3(I148M),TM6SF2(E167K),HSD17B13|prot:CK-18,FGF21|prs:有效|sop:masld_sop|gene建议:家族史/不明脂肪肝时查
+帕金森|parkinson→gene:LRRK2,GBA,PARK2,PINK1|prot:α-synuclein,NFL|sop:parkinson_disease_sop|gene建议:早发(<50岁)/家族史时查
+COPD→gene:SERPINA1(AATD)|prot:AAT,CRP|sop:copd_sop|gene建议:早发肺气肿(<45岁)/非吸烟者必查
+骨质疏松|osteoporosis→gene:COL1A1/A2(OI),LRP5,WNT1|sop:osteoporosis_sop|gene建议:早发骨折(<50岁)/蓝巩膜时查
+哮喘|asthma→gene:ADAM33,ORMDL3(多基因/PRS为主)|prot:IgE,IL-5|sop:asthma_sop|gene建议:早发重症时PRS
+CKD→gene:PKD1/2,APOL1,UMOD,COL4A3-5|prot:CystatinC,KIM-1|sop:ckd_sop|gene建议:家族史/早发(<40岁)/多囊肾时查
+→ APOL1:非裔高频(G1/G2),纯合OR=7-10|PRS:复杂CKD有效
+抑郁症|MDD→gene:高度多基因(h²≈37%),药物基因组:CYP2D6,CYP2C19|prot:BDNF,CRP|sop:depression_sop
+→ 基因建议:治疗抵抗时查CYP2D6+CYP2C19;PRS临床增量有限
+卒中|stroke→gene:PITX2,ZFHX3(CE亚型),HDAC9(LVD),9p21/ANRIL|prot:Lp-PLA2,NT-proBNP|sop:stroke_sop
+→ h²≈39%(IS)/29%(ICH);TOAST分型;早发(<55岁)查NOTCH3(CADASIL)+GLA(Fabry)|PRS:有效
+心衰/心肌病|heart_failure→gene:TTN,LMNA,MYH7,MYBPC3,RBM20,BAG3,PKP2,DSP|prot:NT-proBNP,sST2,Gal-3|sop:heart_failure_sop
+→ 亚型:HCM(MYBPC3+MYH7=70%阳性),DCM(TTN截断~25%),ARVC(PKP2~40%)|h²≈26%|LMNA=高SCD风险→早期ICD|PRS:新兴
+IBD|ibd→gene:NOD2(CD,OR=2-40),ATG16L1,IRGM,IL23R,HLA-DRB1(UC)|prot:CRP,calprotectin|sop:ibd_sop|gene建议:VEO-IBD(<6岁)必查
+→ VEO-IBD:IL10/IL10RA/IL10RB→HSCT;药物基因组:TPMT+NUDT15(CPIC A级,硫唑嘌呤)|Fulgent 122基因panel|PRS:AUC~0.65-0.70(研究阶段)
+癫痫|epilepsy→gene:SCN1A(Dravet),KCNQ2(新生儿),SCN2A,STXBP1,CDKL5,SCN8A|prot:无直接标记(NSE/IL-6间接)|sop:epilepsy_sop|gene建议:DEE/早发(<2岁)/药物难治必查
+→ h²~65%(广义);70基因panel诊断率15.4%(n=8565);DEE亚组30-50%;ILAE推荐ES/GS一线|药物基因组:HLA-B*15:02(CBZ→SJS,东亚),SCN1A LoF禁Na通道阻滞剂,SLC2A1→生酮饮食
+
+## [LOW-FREQ KEYWORDS]
+类风湿关节炎|rheumatoid_arthritis→gene:HLA-DRB1(共享表位),PTPN22,STAT4|prot:RF,抗CCP/抗环瓜氨酸肽,CRP|sop:rheumatoid_arthritis_sop|gene建议:早发/难治/家族史时查PRS
+→ HLA-DRB1共享表位(SE):~60%患者携带;h²~60%;PRS可用于风险预测
+甲状腺功能减退|hypothyroidism→gene:TSHR(桥本),TG,FOXE1,PAX8|prot:TSH,FT4,TPOAb,TgAb|sop:hypothyroidism_sop|基因建议:早发(<30岁)/家族史/自身免疫时查
+→ 90%为自身免疫性(桥本);TPOAb阳性女性10-15%;h²~65%;PRS有效
+静脉血栓栓塞|VTE→gene:F5(Leiden),F2(凝血酶原G20210A),SERPINC1,PROS1,PROC|prot:D-dimer|sop:vte_sop|基因建议:复发/早发(<50岁)/家族史必查
+→ F5 Leiden:欧裔5%携带,纯合OR=50-80;F2 G20210A:欧裔2-3%携带,OR=2-5;h²~50%
+恶性黑色素瘤|melanoma→gene:CDKN2A(高外显),MC1R(红发基因),BRAF(V600E,体细胞)|prot:S100B,LDH|sop:melanoma_sop|基因建议:家族史/早发/多发痣时查
+→ CDKN2A:终生风险20-50%(F)/10-17%(M);MC1R变异者风险增加2-3倍;h²~58%
+胃癌|gastric_cancer→gene:CDH1(弥漫型),TP53,BRCA2,MLH1/MSH2(Lynch)|prot:CA72-4,CEA,PGI/PGII|sop:gastric_cancer_sop|基因建议:家族史/弥漫型/早发(<40岁)必查
+→ CDH1:弥漫型胃癌终生风险37-70%;Lynch:胃癌风险5-10%;h²~25-30%
+肝细胞癌|HCC→gene:PNPLA3(与MASLD协同),TERT启动子,CTNNB1,TP53|prot:AFP,DCP/PIVKA-II|sop:hcc_sop|基因建议:MASLD/肝硬化/家族史时查
+→ PNPLA3 I148M:MASLD→HCC风险增加2-3倍;h²~40%;AFP监测
+胰腺癌|pancreatic_cancer→gene:BRCA2(5-10%),PALB2(1-3%),CDKN2A,TP53|prot:CA19-9,CEA|sop:pancreatic_cancer_sop|基因建议:家族史/早发/德系犹太裔必查
+→ BRCA2突变:终生风险5-10%;CDKN2A:Melanoma-PC综合征;h²~35%;5年生存率<10%
+(已清空——所有疾病已建立条目)
+
+## [RULES]
+- PRS在有高外显率致病变异时增量价值小
+- 蛋白数据仅~50K人有(10%)，缺失时正常
+- 优先查基因再查蛋白: 基因结果可能使蛋白查询不必要
+- 家族史阳性时基因查询几乎总是值得的
+- 多基因病(T2D,CAD)PRS比单基因查询更有增量价值
+- 同一患者基因结果可缓存(终身不变)
+- 非欧洲裔PRS效力下降，需标注不确定性
+
+## [INFRA / 通用流程]
+web工具不可用/报错→sop:web_setup_sop|复杂多步任务→sop:plan_sop|子任务并行(待实现)→sop:subagent_sop|定时任务→sop:scheduled_task_sop
+桌面键鼠(Windows)→sop:ljqCtrl_sop|内存扫描(Windows)→sop:mem_scanner_sop|浏览器注入(参考)→sop:tmwebdriver_sop
+
+### web_scan 连接失败排查（按序执行）
+① TM没装？→遍历本机所有Chromium浏览器(Chrome/Edge/Brave…)用户数据目录下Extensions/，各子目录manifest.json搜"tampermonkey"|没找到→走web_setup_sop；找到→记住装在哪个浏览器
+② 浏览器没开？→检查①对应的浏览器进程是否在跑(tasklist/ps)，没有则启动并打开正常URL（⚠about:blank等内部页不加载扩展）
+③ WS后台挂了？→socket.connect_ex(('127.0.0.1',18766))非0即dead→手动`from TMWebDriver import TMWebDriver; TMWebDriver()`起master
+
+## [PHONE CONTROL]
+手机控制→tool:phone_control,phone_screen_analyze|sop:phone_control_sop
+- 外卖: 美团=com.sankuai.meituan, 美团外卖=com.sankuai.meituan.takeoutnew, 饿了么=me.ele
+- 健康: Keep=com.gotokeep.keep, 华为健康=com.huawei.health
+- 地图: 高德地图=com.autonavi.minimap, 百度地图=com.baidu.BaiduMap
+- 打车: 滴滴出行=com.sogou.map.android.maps
+- 社交: 微信=com.tencent.mm
+- 支付/转账操作前必须 ask_user 确认
+- 操作流程: check_connection → launch_app → ui_dump → tap/swipe → ui_dump验证
+
+### [医院搜索与路线规划]
+- 功能: 搜索附近医院、查看医院信息、规划路线
+- 工具: phone_control
+- SOP: amap_hospital_search_sop
+- 操作流程: 启动高德地图 → 搜索附近医院 → 筛选真正的医院 → 选择距离最近的医院 → 规划路线
+
+### [打车服务]
+- 功能: 通过微信或滴滴出行叫车
+- 工具: phone_control
+- SOP: didi_taxi_sop, wechat_taxi_sop
+- 操作流程: 启动应用 → 进入打车界面 → 输入目的地 → 叫车
+
+### [医院挂号]
+- 功能: 通过微信医疗健康挂号
+- 工具: phone_control
+- SOP: wechat_appointment_sop
+- 操作流程: 启动微信 → 进入服务 → 进入医疗健康 → 关闭广告 → 挂号 → 搜索医院
+
+## [PHONE_APP_FLOWS]
+（通过 ADB 操控手机 App 的专项流程，每行一个 App/场景→对应 SOP）
+美团外卖订单健康分析→sop:meituan_food_analysis_sop|tool:phone_control,phone_screen_analyze
+- 流程要点: 首次先 check_connection → launch_app(或失败时桌面点击法) → 动态进入订单列表 → 视觉分析+滚动收集（后续失败才重查连接）
+- 推荐包名: app="美团" 或 com.sankuai.meituan；避免 com.sankuai.meituan.takeoutnew(MainActivity 不存在)
+- 进入订单: 用 ui_dump(keyword="订单") 或 phone_screen_analyze 动态定位，不硬编码坐标；美团外卖点底部「订单」，主 App 为「我的」→「全部订单」
+- 收集订单: 3-10 单足够(3 单最低有效，10 单平衡成本)；phone_screen_analyze 列订单后 scroll_down，等 0.5 秒再分析，到底判断为连续 2 次滚动见相同订单
+- 快速查看(3-5 单): 1-2 次截图；标准分析(约 10 单): 3-4 次截图+滚动
+- 必须: 每步操作后用 phone_screen_analyze 确认；涉及支付必须 ask_user；不点「再来一单」「去支付」；不把订单详情写长期记忆
+- 视觉不可用时: ui_dump + scroll_down(可能缺菜品，需点进详情)
+- 分析维度: 频次/菜品类型/营养结构/健康风险；输出: 健康评分(1-10)+ 具体改善建议
+知乎热榜查看→tool:phone_control,phone_screen_analyze
+- 推荐包名: com.zhihu.android；直接用应用名“知乎”启动可能失败，优先用包名
+- 流程要点: 首次 check_connection → launch_app(com.zhihu.android) → ui_dump/视觉确认首页 → 点击顶部「热榜」标签 → 读取前几条并总结（后续失败才重查连接）
+- 验证点: 首页顶部常见标签含 关注/推荐/热榜；切到热榜后再抓取内容，避免误读推荐页
+小米健康查看→tool:phone_control,phone_screen_analyze
+- 推荐包名: com.mi.health；已验证可直接用 launch_app 启动
+- 流程要点: 首次 check_connection → launch_app(com.mi.health) → ui_dump/视觉确认已进入首页（后续失败才重查连接）
+- 查看压力: 首页未必直接看到「压力」，常需先下滑到健康页/卡片区，再用 ui_dump(keyword="压力") 或视觉分析定位压力卡片并进入详情
+- 读取策略: 优先用 phone_control(action="ui_dump") 读取当前页文本；文本不全、图表较多或元素缺失时，再用 phone_screen_analyze 补充识别
+- 周数据读取: 进入压力详情后切到「周」视图，重点读取平均压力、等级（如轻度压力）、最大值、最小值，以及哪些日期显示无数据
+- 周视图判定: 顶部已显示一周日期区间（如“2026年3月16日至22日”）且有「日/周/月」切换时，通常已在周视图；可先用 ui_dump 直接读取每日范围与平均/最大/最小，避免额外点击
+- 验证点: 已进入小米健康首页，常见为底部「健康」页/首页内容可见；压力详情页需确认已切到「周」后再解读
+（后续可扩展: 饿了么订单分析、Keep运动、华为健康等→各建独立 sop）
+一键健康分析→sop:one_click_health_analysis_sop|tool:phone_control,phone_screen_analyze,analyze_lifestyle|实现:stapp.py+tools/one_click_health.py
+- 入口与触发: 侧栏「🏥 一键健康分析」→ 主按钮「🚀 开始一键健康分析」→ 主区弹出「📋 健康分析计划确认」表单（session `_show_health_plan_form`）
+- 计划确认: 「分析时间范围（天）」number_input 1–30；子任务为多选 checkbox（文案为 name + description，默认勾选依各条 `enabled_by_default`，缺省 True）；至少勾选一个才可点「✅ 确认执行」，「❌ 取消」关闭表单
+- 执行链路: 确认后 `build_one_click_analysis_prompt` 生成带 `mode=one_click_health_analysis` 的指令；对话区先追加一条用户可见摘要（天数+所选子任务名），再以 `agent_backend_stream` 流式跑 Agent；Agent 须先读主 SOP 并按 tasks 顺序串行子 SOP，最后按 SOP 综合报告模板输出
+- 子任务列表: 来自 `memory/L3_sops/one_click_health_analysis_sop.md` 首个 ```json 围栏内 `subtasks`；解析失败则回退 `DEFAULT_SUBTASKS`。扩展新场景: 侧栏「➕ 将本轮对话加入一键健康分析」（即规程/工具提示中的「主动更新子任务注册表」白名单流程）→ `build_registry_update_prompt` + `put_task(..., one_click_registry_update=True, task_enable_long_term_memory=False)`，按 `one_click_registry_update_sop.md` 仅 file_patch 更新 subtasks JSON，并同步本文件 `## [ONE_CLICK_HEALTH]` 指针行
+- 当前子任务（须与 JSON / DEFAULT_SUBTASKS 一致）: meituan_food_analysis（美团外卖饮食分析）+ xiaomi_stress_analysis（小米运动健康压力分析）
+- 隐私约束: 注册流程侧栏说明承诺不把本轮对话隐私原文写入长期记忆；分析结果侧仍不将原始订单/压力原始数值写入长期记忆，仅记录评分、摘要与方法性经验
+
+## [ONE_CLICK_HEALTH]
+（一键子任务注册指针；须与 memory/L3_sops/one_click_health_analysis_sop.md 首个 JSON 围栏内 subtasks 一致；由侧栏「➕ 将本轮对话加入一键健康分析」触发的注册任务 + file_patch 维护；tools 内错误提示或仍写「主动更新子任务注册表」，与此为同一流程）
+meituan_food_analysis→sop:meituan_food_analysis_sop|tool:phone_control,phone_screen_analyze
+xiaomi_stress_analysis→sop:xiaomi_health_analysis_sop|tool:phone_control,phone_screen_analyze
+
+## [HEALTH_MANAGEMENT]
+体检报告解读→tool:parse_checkup_report,interpret_indicator,compare_checkup_history
+生活方式管理→tool:log_lifestyle,analyze_lifestyle
+用药管理→tool:manage_medication,check_drug_interaction
+提醒→tool:set_health_reminder,list_reminders
+风险初筛→tool:health_risk_screening
+- 所有健康建议末尾应提醒「仅供参考，如有不适请咨询医生」
+- 指标严重异常时必须建议就医（空腹血糖>11.1, 收缩压>180等）
+- 搜索时禁止包含用户个人信息
+- 体检报告解读流程: parse_checkup_report → interpret_indicator(逐个) → compare_checkup_history(趋势)
+用药审查→tool:medication_review,check_drug_interaction|sop:medication_review_sop
+- 用药审查流程: load_user_profile → medication_review(full) → [web_search确认] → ask_user → update_user_profile
+- 新增用药时自动触发审查，禁忌级问题必须建议就医
+病历质控→tool:extract_medical_record,check_medical_record|sop:medical_record_qc_sop
+- 病历质控流程: extract_medical_record → check_medical_record → ask_user确认 → 回写+联动用户画像
+ICD编码→tool:suggest_icd_codes,validate_icd_combination|sop:icd_coding_sop
+- ICD编码流程: extract_medical_record → suggest_icd_codes → validate_icd_combination → ask_user复核
+证据分级→tool:record_evidence_citation|sop:evidence_grading_framework_sop
+- 基础层协议: T1指南/T2共识/T3说明书制度/T4文献/T5数据分析/T6 LLM推理
+- 引用档位: strict(合规场景)/standard(临床场景)/relaxed(科普场景) → config.evidence_citation_level
+临床路径合规→tool:check_pathway_compliance,record_evidence_citation|sop:clinical_pathway_compliance_sop
+- 合规流程: extract_medical_record → check_pathway_compliance(pathway/insurance/both) → record_evidence_citation → ask_user
+合规材料审阅→tool:review_compliance_material,record_evidence_citation|sop:compliance_review_sop
+- 审阅流程: review_compliance_material → 逐条验证(web_search确认PMID) → record_evidence_citation → 自动生成参考文献列表
+影像报告解读→tool:parse_imaging_report,compare_imaging_reports,query_imaging_detail|sop:imaging_report_interpretation_sop
+- 解读流程: parse_imaging_report → 逐项分级(🔴🟠🟡🟢) + 通俗翻译 + 分级标准引用(Lung-RADS/TI-RADS/BI-RADS等)
+- 随访对比: compare_imaging_reports(current, prior) → 大小/形态/新发/消失/趋势
+- 影像决策: imaging_centered_decision_sop → 影像充分时直接诊断，不充分时升级分子检测
+
+
+## [USER_TAGS]
+(由系统自动维护——用户标签摘要，如: 男/35岁/高血压/二甲双胍)

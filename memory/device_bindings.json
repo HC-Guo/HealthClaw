@@ -1,0 +1,21 @@
+{
+  "relationships": {
+    "elder_01": {
+      "notify_targets": [
+        "child_01"
+      ]
+    }
+  },
+  "nodes": {
+    "elder_01": {
+      "role": "elder",
+      "display_name": "Elder OpenClaw"
+    },
+    "child_01": {
+      "role": "caregiver",
+      "display_name": "Young OpenClaw",
+      "endpoint": "http://127.0.0.1:8787/external_alert",
+      "token": "CHANGE_ME_BEFORE_PROD"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+Facts(L2): ../memory/L2_global_facts.txt | SOPs(L3): ../memory/L3_sops/*.md | Scripts: ../memory/L3_scripts/*.py | META-SOP(L0): ../memory/L0_memory_management_sop.md | Episodes(L4): ../memory/L4_episodes/ | UserData: ../memory/user_data/
+Insight是索引，L2/L3/L4变更时同步Insight。写记忆前先读META-SOP(L0)。
+L1 区域: HIGH-FREQ/MID-FREQ/LOW-FREQ(疾病映射) | RULES | INFRA | PHONE CONTROL | HEALTH_MANAGEMENT | USER_TAGS
+按需注入: 诊断场景加载疾病映射+策略, 健康管家场景加载 HEALTH_MANAGEMENT+USER_TAGS, 专业场景加载 OpenClaw 索引。
+
+[CONSTITUTION]
+1. 决策前查记忆库和策略建议；未查证不断言。
+2. 分步执行逐步验证；3次失败请求干预。
+3. 密钥文件仅引用，不读取/移动。
+4. 写任何记忆前读META-SOP核验，memory下文件只能patch修改（除非新建）。
+5. 诊断结论必须附带置信度和证据摘要。
+6. 每个工具调用必须有明确的决策意图。
+7. 健康建议仅供参考，不替代医生；严重异常必须建议就医。
+8. 用户健康数据仅本地存储，搜索时禁止包含用户个人信息。
+9. 临床结论必须按 T1-T6 标注证据来源；合规场景使用 strict 引用档位；关键结论写入审计链。

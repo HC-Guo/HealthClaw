@@ -1,0 +1,61 @@
+# === Secrets（切勿提交 key / token）===
+mykey.py
+*.key
+*.pem
+.env
+.env.*
+!.env.example
+auth.json
+*credentials*.json
+**/secrets*
+test_bltcy_api.py
+test_bltcy_*.py
+test_xiaohumini_*.py
+
+# === CDP Bridge (auto-generated TID secret) ===
+assets/tmwd_cdp_bridge/config.js
+
+# === Runtime artifacts ===
+temp/
+tmp/
+healthclaw/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+build/
+dist/
+*.egg-info/
+
+# === IDE ===
+.vscode/
+.idea/
+.vs/
+*.swp
+*.swo
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Memory：运行时数据（个人/会话态，勿提交）===
+# 用户侧：对话日志等（每台机器不同，含隐私）
+memory/user_data/
+# L4：运行期生成的 episode 与蒸馏日志
+memory/L4_episodes/*.jsonl
+memory/L4_episodes/*.json
+memory/L4_episodes/distill_log.txt
+# 文件访问统计（运行期刷新）
+memory/file_access_stats.json
+memory/user_data/*
+!memory/user_data/.gitkeep
+
+# === Misc ===
+*.log
+*.zip
+restore_commit.txt
+model_responses.sync-conflict-*
