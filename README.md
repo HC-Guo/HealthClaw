@@ -290,4 +290,13 @@ See `LICENSE` in the repository root.
 
 ## Acknowledgements
 
-(To be filled)
+We are grateful for the following excellent projects. If you’re interested, please check them out.:
+
+- **[GenericAgent](https://github.com/lsdefine/GenericAgent)** 
+- **[OpenClaw](https://docs.openclaw.ai/zh-CN)** 
+- **[OpenClaw Medical Skills](https://github.com/FreedomIntelligence/OpenClaw-Medical-Skills)** 
+
+
+
+## Star History
+[![Star History Chart](https://api.star-history.com/svg?repos=HC-Guo/HealthClaw&type=Date)](https://star-history.com/#HC-Guo/HealthClaw&Date)
