@@ -290,5 +290,8 @@ python seda_main.py --verbose
 ---
 
 ## 🙏 致谢
+我们感谢以下项目：
+- **[OpenClaw](https://docs.openclaw.ai/zh-CN)** — documentation and the gateway-oriented agent stack that informs multi-surface health workflows.
+- **[GenericAgent](https://github.com/lsdefine/GenericAgent)** — a minimal, self-evolving PC agent framework whose layered memory and execution patterns influenced our design.
+- **[OpenClaw Medical Skills](https://github.com/FreedomIntelligence/OpenClaw-Medical-Skills)** — a large open medical skills library that complements clinical and omics-oriented agent capabilities.
 
-（待填）
