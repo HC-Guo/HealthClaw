@@ -4,7 +4,7 @@
 
 <h1>🩺 HealthClaw: Self-Evolving Personal Health Copilot</h1>
 
-A self-evolving agent stack for medical consultation support, personal health management, and multimodal health analytics
+An open-source self-evolving agent stack for medical consultation support, personal health management, and multimodal health analytics
 
 <br/>
 
