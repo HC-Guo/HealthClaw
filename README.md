@@ -124,51 +124,6 @@ and support clinicians for deeper analysis—always as decision support, not a d
 
 > **Core loop:** `[personal health memory + multi-device data + scenario tasks]` → agent reasoning and tools → outputs (Web / Feishu / nodes) → five-layer memory and self-evolution.
 
-```
-  User · data · tasks
-          │
-          ▼
-  ┌───────────────────────────────────────────┐
-  │ Entry layer                               │
-  │ Streamlit · Feishu · CLI · binding_cli    │
-  └─────────────────────┬─────────────────────┘
-                        │
-                        ▼
-  ┌───────────────────────────────────────────┐
-  │ Agent core ( Think → Decide → Act )       │
-  │ seda_main · agent_loop · ukb_handler      │
-  └──────────┬───────────────────────┬────────┘
-             │                       │
-             ▼                       ▼
-  ┌──────────────────────┐   ┌──────────────────────┐
-  │ Tool layer           │   │ Browser bridge       │
-  │ med · omics · imaging│   │ TMWebDriver · CDP ·  │
-  │ wear · bioinfo ·     │   │ assets               │
-  │ browser · phone      │   │                      │
-  └──────────┬───────────┘   └──────────┬───────────┘
-             │                          │
-             └────────────┬─────────────┘
-                          ▼
-  ┌───────────────────────────────────────────┐
-  │ MEMORY (L0–L4)                            │
-  │ L0→L1→L2 · L3 scripts · L4 cases · data   │
-  └──────────────────────▲────────────────────┘
-                         │
-                         │ write / distill
-                         │
-  ┌──────────────────────┴────────────────────┐
-  │ EVOLUTION                                 │
-  │ episode_writer · strategy_distiller ·     │
-  │ self_evaluator                            │
-  └───────────────────────────────────────────┘
-
-  ┌───────────────────────────────────────────┐
-  │ Reliability (cross-cutting)               │
-  │ multi-backend retry · fallback · recovery │
-  │ sidercall · ga                            │
-  └───────────────────────────────────────────┘
-```
-
 ---
 
 ## Quick start
