@@ -4,7 +4,7 @@
 供 ga.py / seda_main.py / stapp.py 引用，避免逻辑与文案散落多处。
 
 Agent 侧执行步骤、报告模板、注册表更新规程仍以 L3  Markdown 为准：
-- memory/L3_sops/one_click_health_analysis_sop.md
+- memory/L3_sops/one_click_health_analysis_sop.md（注册表 JSON 含 name_en/description_en 供英文 UI）
 - memory/L3_sops/one_click_registry_update_sop.md
 本模块不替代上述 SOP，仅保证路径/mode/闸门与 UI 与之一致。
 """
@@ -37,14 +37,18 @@ DEFAULT_SUBTASKS: list[dict[str, Any]] = [
     {
         "id": "meituan_food_analysis",
         "name": "美团外卖饮食分析",
-        "description": "读取美团外卖近期订单，分析饮食结构与健康风险",
+        "description": "读取美团外卖近期订单，分析饮食结构、营养均衡度与健康风险",
+        "name_en": "Meituan food delivery analysis",
+        "description_en": "Read recent Meituan orders; analyze diet structure, nutritional balance, and health risks",
         "sop_file": "meituan_food_analysis_sop.md",
         "enabled_by_default": True,
     },
     {
         "id": "xiaomi_stress_analysis",
         "name": "小米运动健康压力分析",
-        "description": "读取小米运动健康App压力周视图，分析压力水平与风险",
+        "description": "读取小米运动健康App压力周视图，分析压力水平、高压时段与风险提示",
+        "name_en": "Xiaomi Health stress analysis",
+        "description_en": "Read the Xiaomi Health app weekly stress view; analyze stress levels, high-pressure periods, and risk notes",
         "sop_file": "xiaomi_health_analysis_sop.md",
         "enabled_by_default": True,
     },

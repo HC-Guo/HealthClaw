@@ -11,6 +11,8 @@
 
 以下 JSON 仍为**唯一权威子任务列表**；`DEFAULT_SUBTASKS` 仅在解析失败时供前端回退，勿与 JSON 长期不一致。扩展子任务优先走 `one_click_registry_update_sop.md` 白名单流程 patch 本块。
 
+**双语 UI 字段（与 Streamlit 语言切换一致）**：除 `name` / `description`（中文，供报告与中文界面）外，每项应包含 **`name_en`**、**`description_en`**（英文标题与说明）。英文界面展示英字段；若缺省则回退到 `name` / `description`。
+
 <!-- REGISTRY: subtasks JSON only — 仅「主动更新子任务注册表」白名单任务可对本文件执行 file_patch，且只能改下方首个 JSON 围栏内的 subtasks；禁止改本注释与 PROTECTED 区。 -->
 ## 子任务注册表（UI驱动数据源）
 
@@ -23,6 +25,8 @@
       "id": "meituan_food_analysis",
       "name": "美团外卖饮食分析",
       "description": "读取美团外卖近期订单，分析饮食结构、营养均衡度与健康风险",
+      "name_en": "Meituan food delivery analysis",
+      "description_en": "Read recent Meituan orders; analyze diet structure, nutritional balance, and health risks",
       "sop_file": "meituan_food_analysis_sop.md",
       "enabled_by_default": true
     },
@@ -30,6 +34,8 @@
       "id": "xiaomi_stress_analysis",
       "name": "小米运动健康压力分析",
       "description": "读取小米运动健康App压力周视图，分析压力水平、高压时段与风险提示",
+      "name_en": "Xiaomi Health stress analysis",
+      "description_en": "Read the Xiaomi Health app weekly stress view; analyze stress levels, high-pressure periods, and risk notes",
       "sop_file": "xiaomi_health_analysis_sop.md",
       "enabled_by_default": true
     }

@@ -27,7 +27,8 @@
 1. 若尚无独立 SOP：用 `file_write` **新建** `memory/L3_sops/<slug>_sop.md`（仅 App 操作步骤、验证点、失败处理；不含一键综合报告模板）。
 2. 对主 SOP **仅** `file_patch`：在 `subtasks` 数组中**追加**一项，字段建议：
    - `id`：全局唯一 snake_case
-   - `name` / `description`：简短中文
+   - `name` / `description`：简短中文（综合报告子标题等仍用 `name`）
+   - **`name_en` / `description_en`**：英文标题与一句话说明（供 Streamlit 英文界面展示；**必填**，与中文语义一致）
    - `sop_file`：与新建文件名一致，如 `huawei_export_health_analysis_sop.md`
    - `enabled_by_default`：新任务建议 `false`，由用户在 UI 勾选启用
 3. `file_patch` 更新 L1 的 `## [ONE_CLICK_HEALTH]`（保持小节存在；只改指针行，勿动其他疾病映射区块）。
