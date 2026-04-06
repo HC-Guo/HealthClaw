@@ -91,7 +91,6 @@
 - 成本更低
 - 文字更稳定
 - 便于后续复核与自动抽取
-- 可优先使用 `phone_control(action="tap_keyword_confirm", keyword="压力", confirm_keyword="周")` 这类原子动作，减少「找元素+点击+确认」的多轮调用
 
 ### 策略 2：图表场景切视觉分析
 以下情况应切到 `phone_screen_analyze`：
@@ -136,11 +135,12 @@
 
 ## 回退策略
 按以下顺序回退：
-1. `phone_control(action="tap_keyword_confirm", keyword="压力")`
-2. 若未命中，`scroll_down` 后再次 `tap_keyword_confirm(keyword="压力")`
-3. 进入详情后，必要时 `tap_keyword_confirm(keyword="周", confirm_keyword="周")`
-4. 全量 `ui_dump`
-5. 若仍不完整，使用 `phone_screen_analyze`
+1. `ui_dump(keyword="压力")`
+2. `scroll_down` 后再次 `ui_dump`
+3. 点击压力卡片进入详情
+4. 切换“周”
+5. 全量 `ui_dump`
+6. 若仍不完整，使用 `phone_screen_analyze`
 
 若仍失败，再考虑：
 - 查看当前前台应用是否正确：

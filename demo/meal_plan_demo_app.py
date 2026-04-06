@@ -12,6 +12,7 @@ from pathlib import Path
 
 import lark_oapi as lark
 import streamlit as st
+from PIL import Image
 from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
 from lark_oapi.api.im.v1 import CreateImageRequest, CreateImageRequestBody
 
@@ -75,8 +76,108 @@ DEMO_FSAPP_PID = TEMP_DIR / "demo_fsapp.pid"
 
 DEFAULT_ADB_SOCKET = os.environ.get("ADB_SERVER_SOCKET", "tcp:127.0.0.1:15038")
 DEFAULT_REQUEST = "我想减肥，给我未来一个月的用餐计划，中午12点吃饭，晚饭18点半。"
+DEFAULT_REQUEST_EN = "I want to lose weight. Give me a meal plan for the next month. Lunch at 12:00, dinner at 18:30."
 DEFAULT_MEAL = "lunch"
 TARGET_OPEN_ID = str((getattr(mykey, "fs_external_alert_targets", {}) or {}).get("child_01", "") or "")
+
+UI_TEXT = {
+    "zh": {
+        "title": "HealthClaw饮食计划与推荐演示",
+        "caption": "这套 demo 会实际走：饮食计划生成 -> 真机美团搜索 -> 候选餐推荐 -> 尝试加入购物车 -> 飞书推送。",
+        "section_env": "1. 环境检查",
+        "check_phone": "检查手机链路",
+        "start_fsapp": "启动飞书服务",
+        "stop_fsapp": "停止飞书服务",
+        "reset_demo": "重置 demo 数据",
+        "phone_status": "**手机状态**",
+        "target_open_id": "**飞书目标 open_id**",
+        "push_target": "推送目标 open_id",
+        "fsapp_status": "**fsapp 启动结果**",
+        "section_plan": "2. 生成饮食计划",
+        "request_label": "需求描述",
+        "generate_plan": "生成月度饮食计划",
+        "plan_summary": "**计划摘要**",
+        "plan_preview": "**计划 JSON 预览**",
+        "plan_empty": "先在这里生成一条月度饮食计划。",
+        "section_live": "3. 执行真实推荐",
+        "choose_meal": "选择本餐",
+        "query_override": "手机美团搜索词覆盖",
+        "query_override_help": "如果你想演示更稳定的真机结果，可以在这里手动指定搜索词。",
+        "progress_title": "**实时执行过程**",
+        "run_flow": "执行本餐推荐流程",
+        "push_to_feishu": "将本餐推荐推送到飞书",
+        "need_plan": "请先生成饮食计划。",
+        "need_push": "请先执行本餐推荐流程。",
+        "fallback_error": "当前 demo 发生了回退，这不符合“全真实链路”要求。请重新执行并排查手机链路。",
+        "live_warning": "真实链路未完全打通：{status} / {message}",
+        "push_preview": "**最终推送文案预览**",
+        "live_json": "**执行结果 JSON**",
+        "feishu_sent": "已发送飞书测试消息: {message_id}",
+        "llm_process": "**LLM 执行过程**",
+        "llm_error": "LLM 调用失败: {error}",
+        "llm_empty": "LLM 返回为空。",
+        "llm_model": "模型: {model}",
+        "llm_input": "查看发给 LLM 的输入",
+        "llm_output": "查看 LLM 输出",
+        "empty_output": "(empty output)",
+        "result_empty": "点“执行本餐推荐流程”后，这里会展示完整推荐结果。",
+        "result_page": "搜索结果页",
+        "merchant_page": "店铺页",
+        "cart_page": "购物车/规格页",
+        "no_image": "暂无截图",
+        "demo_log": "Demo 日志",
+        "fsapp_log": "fsapp 日志",
+        "feishu_test_title": "**测试消息：饮食计划推荐流程演示**\n\n",
+    },
+    "en": {
+        "title": "HealthClaw Meal-plan Recommendation Demo",
+        "caption": "This demo walks through the real chain: meal-plan generation -> phone Meituan search -> candidate recommendations -> add-to-cart attempt -> Feishu push.",
+        "section_env": "1. Environment Check",
+        "check_phone": "Check phone chain",
+        "start_fsapp": "Start Feishu service",
+        "stop_fsapp": "Stop Feishu service",
+        "reset_demo": "Reset demo data",
+        "phone_status": "**Phone status**",
+        "target_open_id": "**Feishu target open_id**",
+        "push_target": "Push target open_id",
+        "fsapp_status": "**fsapp start result**",
+        "section_plan": "2. Generate Meal Plan",
+        "request_label": "Request",
+        "generate_plan": "Generate monthly meal plan",
+        "plan_summary": "**Plan summary**",
+        "plan_preview": "**Plan JSON preview**",
+        "plan_empty": "Generate a monthly meal plan here first.",
+        "section_live": "3. Run Live Recommendation",
+        "choose_meal": "Choose meal",
+        "query_override": "Phone Meituan query override",
+        "query_override_help": "For a more stable live-phone demo, you can manually set the Meituan query here.",
+        "progress_title": "**Live execution log**",
+        "run_flow": "Run this meal flow",
+        "push_to_feishu": "Push this meal result to Feishu",
+        "need_plan": "Generate a meal plan first.",
+        "need_push": "Run the meal flow first.",
+        "fallback_error": "The demo fell back to local data, which breaks the fully live-chain requirement. Please retry and check the phone chain.",
+        "live_warning": "The live chain is not fully connected yet: {status} / {message}",
+        "push_preview": "**Final push preview**",
+        "live_json": "**Execution result JSON**",
+        "feishu_sent": "Feishu test message sent: {message_id}",
+        "llm_process": "**LLM execution details**",
+        "llm_error": "LLM call failed: {error}",
+        "llm_empty": "LLM returned an empty response.",
+        "llm_model": "Model: {model}",
+        "llm_input": "View LLM input",
+        "llm_output": "View LLM output",
+        "empty_output": "(empty output)",
+        "result_empty": "Run the meal flow and the full result will appear here.",
+        "result_page": "Search results page",
+        "merchant_page": "Merchant page",
+        "cart_page": "Cart / spec page",
+        "no_image": "No screenshot yet",
+        "demo_log": "Demo log",
+        "fsapp_log": "fsapp log",
+        "feishu_test_title": "**Test message: meal-plan recommendation demo**\n\n",
+    },
+}
 
 
 def _strip_protocol_tags(text):
@@ -89,20 +190,87 @@ def _strip_protocol_tags(text):
     return text.strip()
 
 
-def build_meal_demo_prompt(plan, push, live):
+def _normalize_locale(locale):
+    return "en" if str(locale or "").strip().lower().startswith("en") else "zh"
+
+
+def _meal_label_display(meal_key, locale):
+    labels = {
+        "zh": {"breakfast": "早餐", "lunch": "午餐", "dinner": "晚餐"},
+        "en": {"breakfast": "Breakfast", "lunch": "Lunch", "dinner": "Dinner"},
+    }
+    loc = _normalize_locale(locale)
+    return labels[loc].get(meal_key, meal_key)
+
+
+def _localized_plan_preview(plan, locale):
+    loc = _normalize_locale(locale)
+    preview_schedule = {}
+    for meal_key in ["breakfast", "lunch", "dinner"]:
+        schedule = copy.deepcopy(plan["meal_schedule"][meal_key])
+        schedule["label"] = schedule.get("label_en") if loc == "en" else schedule.get("label")
+        preview_schedule[meal_key] = schedule
+
+    day_preview = copy.deepcopy(plan["days"][0])
+    if loc == "en":
+        day_preview["theme"] = day_preview.get("theme_en") or day_preview.get("theme")
+        for meal in day_preview.get("meals", {}).values():
+            meal["meal_label"] = meal.get("meal_label_en") or meal.get("meal_label")
+            meal["goal_note"] = meal.get("goal_note_en") or meal.get("goal_note")
+            meal["query"] = meal.get("query_en_display") or meal.get("query")
+
+    return {
+        "goal": plan.get("goal_label_en") if loc == "en" else plan.get("goal_label"),
+        "start_date": plan["start_date"],
+        "meal_schedule": preview_schedule,
+        "day_1": day_preview,
+    }
+
+
+def build_meal_demo_prompt(plan, push, live, locale="zh"):
+    loc = _normalize_locale(locale)
     plan_summary = {
-        "goal_label": plan.get("goal_label", ""),
-        "summary": plan.get("summary", ""),
+        "goal_label": plan.get("goal_label_en", "") if loc == "en" else plan.get("goal_label", ""),
+        "summary": plan.get("summary_en", "") if loc == "en" else plan.get("summary", ""),
         "meal_time": push.get("meal_time", ""),
-        "meal_label": push.get("meal_label", ""),
-        "day_theme": (push.get("day_plan") or {}).get("theme", ""),
-        "meal_spec": push.get("meal_spec", {}),
-        "display_candidates": push.get("display_candidates", []),
+        "meal_label": push.get("meal_label_en", "") if loc == "en" else push.get("meal_label", ""),
+        "day_theme": (push.get("day_plan") or {}).get("theme_en", "") if loc == "en" else (push.get("day_plan") or {}).get("theme", ""),
+        "meal_spec": {
+            **(push.get("meal_spec") or {}),
+            "meal_label": (push.get("meal_spec") or {}).get("meal_label_en") if loc == "en" else (push.get("meal_spec") or {}).get("meal_label"),
+            "goal_note": (push.get("meal_spec") or {}).get("goal_note_en") if loc == "en" else (push.get("meal_spec") or {}).get("goal_note"),
+            "query": (push.get("meal_spec") or {}).get("query_en_display") if loc == "en" else (push.get("meal_spec") or {}).get("query"),
+        },
+        "display_candidates": [
+            {
+                **item,
+                "reason": item.get("reason_en") if loc == "en" else item.get("reason"),
+            }
+            for item in (push.get("display_candidates") or [])
+        ],
         "cart_action": push.get("cart_action", {}),
         "live_status": live.get("live_status", ""),
         "live_message": live.get("live_message", ""),
         "fallback_used": live.get("fallback_used", False),
     }
+    if loc == "en":
+        return (
+            "You are the HealthClaw meal recommendation explainer. "
+            "Based on the real execution result below, explain why this breakfast, lunch, or dinner recommendation was chosen. "
+            "Do not invent Meituan results that were not actually observed, and do not claim payment has already happened.\n\n"
+            "Output requirements:\n"
+            "1. Use English.\n"
+            "2. Output Markdown.\n"
+            "3. You must include these headings:\n"
+            "**LLM Summary**\n"
+            "**Why These Candidates Were Recommended**\n"
+            "**Where The Real Chain Stopped**\n"
+            "**What To Do Next**\n"
+            "4. If add-to-cart failed, clearly say which step failed.\n"
+            "5. If an item was added to cart, clearly state that payment has not happened yet and still requires manual payment.\n\n"
+            "Input data:\n"
+            f"```json\n{json.dumps(plan_summary, ensure_ascii=False, indent=2)}\n```"
+        )
     return (
         "你是 HealthClaw 饮食推荐解释器。"
         "请根据以下真实执行结果，解释这次早餐/午餐/晚餐推荐为什么这样选。"
@@ -144,8 +312,8 @@ def _default_llm_ask(prompt):
     raise RuntimeError("; ".join(errors) or "all_llm_backends_failed")
 
 
-def explain_meal_demo(plan, push, live, llm_ask=None):
-    prompt = build_meal_demo_prompt(plan, push, live)
+def explain_meal_demo(plan, push, live, locale="zh", llm_ask=None):
+    prompt = build_meal_demo_prompt(plan, push, live, locale=locale)
     ask = llm_ask or _default_llm_ask
     try:
         result = ask(prompt)
@@ -242,9 +410,19 @@ def send_feishu_card(open_id, content):
     return result.data.message_id
 
 
+def _prepare_feishu_upload_image(image_path):
+    src = Path(image_path)
+    prepared = TEMP_DIR / f"{src.stem}_feishu.jpg"
+    with Image.open(src) as image:
+        normalized = image.convert("RGB")
+        normalized.save(prepared, format="JPEG", quality=92, optimize=True)
+    return str(prepared)
+
+
 def upload_feishu_image(image_path):
     client = create_feishu_client()
-    with open(image_path, "rb") as image_file:
+    prepared_path = _prepare_feishu_upload_image(image_path)
+    with open(prepared_path, "rb") as image_file:
         body = CreateImageRequestBody.builder().image_type("message").image(image_file).build()
         req = CreateImageRequest.builder().request_body(body).build()
         result = client.im.v1.image.create(req)
@@ -269,13 +447,14 @@ def send_feishu_image(open_id, image_path):
     return result.data.message_id
 
 
-def send_feishu_demo_bundle(open_id, content, artifacts):
+def send_feishu_demo_bundle(open_id, content, artifacts, locale="zh"):
+    labels = (
+        [("搜索结果页截图", artifacts.get("result_screenshot", "")), ("店铺页截图", artifacts.get("merchant_screenshot", "")), ("购物车页截图", artifacts.get("cart_screenshot", ""))]
+        if _normalize_locale(locale) != "en"
+        else [("Search results screenshot", artifacts.get("result_screenshot", "")), ("Merchant page screenshot", artifacts.get("merchant_screenshot", "")), ("Cart page screenshot", artifacts.get("cart_screenshot", ""))]
+    )
     message_ids = {"main": send_feishu_card(open_id, content), "images": []}
-    for label, path in [
-        ("搜索结果页截图", artifacts.get("result_screenshot", "")),
-        ("店铺页截图", artifacts.get("merchant_screenshot", "")),
-        ("购物车页截图", artifacts.get("cart_screenshot", "")),
-    ]:
+    for label, path in labels:
         if not path or not Path(path).exists():
             continue
         text_id = send_feishu_card(open_id, f"**{label}**")
@@ -368,6 +547,7 @@ def build_demo_push(service, plan, meal_key, query_override=""):
         "date": time.strftime("%Y-%m-%d"),
         "meal_key": meal_key,
         "meal_label": aligned_plan["meal_schedule"][meal_key]["label"],
+        "meal_label_en": aligned_plan["meal_schedule"][meal_key].get("label_en", ""),
         "meal_time": aligned_plan["meal_schedule"][meal_key]["meal_time"],
         "day_plan": aligned_plan["days"][0],
         "meal_spec": aligned_plan["days"][0]["meals"][meal_key],
@@ -384,20 +564,20 @@ def phone_status(adb_socket):
     return {"connected": ok, "info": info, "adb_socket": os.environ.get("ADB_SERVER_SOCKET")}
 
 
-def append_progress(logs, message, placeholder=None):
+def append_progress(logs, message, placeholder=None, locale="zh"):
     timestamp = datetime.now().strftime("%H:%M:%S")
     logs.append(f"[{timestamp}] {message}")
     st.session_state["demo_progress_log"] = logs
     if placeholder is not None:
         placeholder.markdown(
-            "**实时执行过程**\n\n" + "\n".join(f"- {item}" for item in logs)
+            (UI_TEXT[_normalize_locale(locale)]["progress_title"] + "\n\n" + "\n".join(f"- {item}" for item in logs))
         )
 
 
-st.set_page_config(page_title="HealthClaw饮食计划演示", layout="wide")
-st.title("HealthClaw饮食计划与推荐演示")
-st.caption("这套 demo 会实际走：饮食计划生成 -> 真机美团搜索 -> 候选餐推荐 -> 尝试加入购物车 -> 飞书推送。")
+st.set_page_config(page_title="HealthClaw Meal Demo", layout="wide")
 
+if "meal_demo_locale" not in st.session_state:
+    st.session_state["meal_demo_locale"] = "zh"
 if "demo_plan" not in st.session_state:
     st.session_state["demo_plan"] = None
 if "demo_push" not in st.session_state:
@@ -413,89 +593,108 @@ if "demo_llm_debug" not in st.session_state:
 if "demo_progress_log" not in st.session_state:
     st.session_state["demo_progress_log"] = []
 
+locale = st.selectbox(
+    "Language / 语言",
+    ["zh", "en"],
+    index=0 if st.session_state.get("meal_demo_locale", "zh") == "zh" else 1,
+    format_func=lambda value: "中文" if value == "zh" else "English",
+)
+st.session_state["meal_demo_locale"] = locale
+
+
+def t(key, **kwargs):
+    text = UI_TEXT[locale][key]
+    return text.format(**kwargs) if kwargs else text
+
+
+st.title(t("title"))
+st.caption(t("caption"))
+
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.subheader("1. 环境检查")
+    st.subheader(t("section_env"))
     adb_socket = st.text_input("ADB_SERVER_SOCKET", value=DEFAULT_ADB_SOCKET)
     ensure_runtime_env(adb_socket)
-    if st.button("检查手机链路", use_container_width=True):
+    if st.button(t("check_phone"), use_container_width=True):
         st.session_state["phone_status"] = phone_status(adb_socket)
-    if st.button("启动飞书服务", use_container_width=True):
+    if st.button(t("start_fsapp"), use_container_width=True):
         st.session_state["fsapp_status"] = start_fsapp(adb_socket)
-    if st.button("停止飞书服务", use_container_width=True):
+    if st.button(t("stop_fsapp"), use_container_width=True):
         st.session_state["fsapp_stop"] = {"stopped": stop_process(DEMO_FSAPP_PID)}
-    if st.button("重置 demo 数据", use_container_width=True):
+    if st.button(t("reset_demo"), use_container_width=True):
         reset_demo_user_data()
         st.session_state["demo_plan"] = None
         st.session_state["demo_push"] = None
         st.session_state["demo_live"] = None
         st.session_state["demo_message_id"] = ""
+        st.session_state["demo_message_bundle"] = None
+        st.session_state["demo_llm_debug"] = None
         st.session_state["demo_progress_log"] = []
 
-    st.markdown("**手机状态**")
+    st.markdown(t("phone_status"))
     st.json(st.session_state.get("phone_status", phone_status(adb_socket)))
-    st.markdown("**飞书目标 open_id**")
-    open_id = st.text_input("推送目标 open_id", value=TARGET_OPEN_ID)
-    st.markdown("**fsapp 启动结果**")
+    st.markdown(t("target_open_id"))
+    open_id = st.text_input(t("push_target"), value=TARGET_OPEN_ID)
+    st.markdown(t("fsapp_status"))
     st.json(st.session_state.get("fsapp_status", {"status": "idle"}))
 
 with col2:
-    st.subheader("2. 生成饮食计划")
-    request_text = st.text_area("需求描述", value=DEFAULT_REQUEST, height=120)
-    if st.button("生成月度饮食计划", type="primary", use_container_width=True):
+    st.subheader(t("section_plan"))
+    request_text = st.text_area(
+        t("request_label"),
+        value=DEFAULT_REQUEST if locale == "zh" else DEFAULT_REQUEST_EN,
+        height=120,
+        key=f"meal_request_{locale}",
+    )
+    if st.button(t("generate_plan"), type="primary", use_container_width=True):
         service = get_demo_service()
         plan = service.create_plan(open_id or "meal_demo_user", request_text)["plan"]
         st.session_state["demo_plan"] = plan
-        st.session_state["demo_plan_message"] = service.format_plan_created_message(plan)
         log_demo(f"已生成 demo 饮食计划，goal={plan['goal']}, open_id={plan['open_id']}")
 
     if st.session_state.get("demo_plan"):
+        service = get_demo_service()
         plan = st.session_state["demo_plan"]
-        st.markdown("**计划摘要**")
-        st.markdown(st.session_state.get("demo_plan_message", ""))
-        preview = {
-            "goal": plan["goal_label"],
-            "start_date": plan["start_date"],
-            "meal_schedule": plan["meal_schedule"],
-            "day_1": plan["days"][0],
-        }
-        st.markdown("**计划 JSON 预览**")
-        st.json(preview)
+        st.markdown(t("plan_summary"))
+        st.markdown(service.format_plan_created_message(plan, locale=locale))
+        st.markdown(t("plan_preview"))
+        st.json(_localized_plan_preview(plan, locale))
     else:
-        st.info("先在这里生成一条月度饮食计划。")
+        st.info(t("plan_empty"))
 
 with col3:
-    st.subheader("3. 执行真实推荐")
+    st.subheader(t("section_live"))
     meal_key = st.selectbox(
-        "选择本餐",
+        t("choose_meal"),
         ["breakfast", "lunch", "dinner"],
         index=["breakfast", "lunch", "dinner"].index(DEFAULT_MEAL),
-        format_func=lambda key: {"breakfast": "早餐", "lunch": "午餐", "dinner": "晚餐"}[key],
+        format_func=lambda key: _meal_label_display(key, locale),
     )
     query_override = st.text_input(
-        "手机美团搜索词覆盖",
+        t("query_override"),
         value="鸡胸肉蔬菜沙拉" if meal_key == "lunch" else "",
-        help="如果你想演示更稳定的真机结果，可以在这里手动指定搜索词。",
+        help=t("query_override_help"),
+        key=f"meal_query_override_{locale}_{meal_key}",
     )
     progress_placeholder = st.empty()
     if st.session_state.get("demo_progress_log"):
         progress_placeholder.markdown(
-            "**实时执行过程**\n\n" + "\n".join(f"- {item}" for item in st.session_state["demo_progress_log"])
+            t("progress_title") + "\n\n" + "\n".join(f"- {item}" for item in st.session_state["demo_progress_log"])
         )
-    if st.button("执行本餐推荐流程", type="primary", use_container_width=True):
+    if st.button(t("run_flow"), type="primary", use_container_width=True):
         if not st.session_state.get("demo_plan"):
-            st.warning("请先生成饮食计划。")
+            st.warning(t("need_plan"))
         else:
             logs = []
-            append_progress(logs, f"开始执行{ {'breakfast':'早餐','lunch':'午餐','dinner':'晚餐'}[meal_key] }推荐流程", progress_placeholder)
             service = get_demo_service()
-            append_progress(logs, "正在对齐今日计划与演示时间", progress_placeholder)
+            append_progress(logs, f"开始执行{_meal_label_display(meal_key, locale)}推荐流程" if locale == "zh" else f"Starting the {_meal_label_display(meal_key, locale)} recommendation flow", progress_placeholder, locale=locale)
+            append_progress(logs, "正在对齐今日计划与演示时间" if locale == "zh" else "Aligning the plan with today's demo time", progress_placeholder, locale=locale)
             aligned_plan = align_plan_for_demo(st.session_state["demo_plan"], meal_key, query_override=query_override)
-            append_progress(logs, "正在重置美团 App 状态", progress_placeholder)
+            append_progress(logs, "正在重置美团 App 状态" if locale == "zh" else "Resetting the Meituan app state", progress_placeholder, locale=locale)
             _run_adb("shell", "am", "force-stop", "com.sankuai.meituan", timeout=20)
             time.sleep(1)
-            append_progress(logs, "正在执行真实手机美团链路（搜索 -> 结果页 -> 店铺页）", progress_placeholder)
+            append_progress(logs, "正在执行真实手机美团链路（搜索 -> 结果页 -> 店铺页）" if locale == "zh" else "Running the real phone Meituan chain (search -> results -> merchant page)", progress_placeholder, locale=locale)
             live = service.prepare_live_meituan_push(
                 aligned_plan,
                 meal_key,
@@ -505,16 +704,22 @@ with col3:
             )
             append_progress(
                 logs,
-                f"真实链路返回：status={live.get('live_status', '') or live.get('status', '')} / fallback={live.get('fallback_used')}",
+                (
+                    f"真实链路返回：status={live.get('live_status', '') or live.get('status', '')} / fallback={live.get('fallback_used')}"
+                    if locale == "zh"
+                    else f"Live chain returned: status={live.get('live_status', '') or live.get('status', '')} / fallback={live.get('fallback_used')}"
+                ),
                 progress_placeholder,
+                locale=locale,
             )
-            append_progress(logs, "正在整理候选餐与推送文案", progress_placeholder)
+            append_progress(logs, "正在整理候选餐与推送文案" if locale == "zh" else "Formatting candidates and push copy", progress_placeholder, locale=locale)
             push = {
                 "plan_id": aligned_plan["id"],
                 "open_id": aligned_plan["open_id"],
                 "date": time.strftime("%Y-%m-%d"),
                 "meal_key": meal_key,
                 "meal_label": aligned_plan["meal_schedule"][meal_key]["label"],
+                "meal_label_en": aligned_plan["meal_schedule"][meal_key].get("label_en", ""),
                 "meal_time": aligned_plan["meal_schedule"][meal_key]["meal_time"],
                 "day_plan": aligned_plan["days"][0],
                 "meal_spec": aligned_plan["days"][0]["meals"][meal_key],
@@ -525,99 +730,108 @@ with col3:
             st.session_state["demo_plan"] = aligned_plan
             st.session_state["demo_live"] = live
             st.session_state["demo_push"] = push
-            st.session_state["demo_push_message"] = service.format_push_message(push)
-            append_progress(logs, "正在调用 LLM 解释推荐结果", progress_placeholder)
-            st.session_state["demo_llm_debug"] = explain_meal_demo(aligned_plan, push, live)
+            append_progress(logs, "正在调用 LLM 解释推荐结果" if locale == "zh" else "Calling the LLM to explain the recommendation", progress_placeholder, locale=locale)
+            st.session_state["demo_llm_debug"] = explain_meal_demo(aligned_plan, push, live, locale=locale)
             llm_debug = st.session_state["demo_llm_debug"]
             append_progress(
                 logs,
-                f"LLM 执行完成：status={llm_debug.get('status', '')} / model={llm_debug.get('model', '') or 'unknown'}",
+                (
+                    f"LLM 执行完成：status={llm_debug.get('status', '')} / model={llm_debug.get('model', '') or 'unknown'}"
+                    if locale == "zh"
+                    else f"LLM finished: status={llm_debug.get('status', '')} / model={llm_debug.get('model', '') or 'unknown'}"
+                ),
                 progress_placeholder,
+                locale=locale,
             )
-            append_progress(logs, "本餐推荐流程执行完成，下面展示最终结果", progress_placeholder)
+            append_progress(logs, "本餐推荐流程执行完成，下面展示最终结果" if locale == "zh" else "The meal flow is complete. Final results are shown below.", progress_placeholder, locale=locale)
             log_demo(
                 f"已执行 {meal_key} 推荐流程，cart_action={live.get('cart_action', {}).get('status', '')}, "
                 f"source={live.get('source', '')}, fallback_used={live.get('fallback_used')}, "
                 f"live_status={live.get('live_status', '')}"
             )
-    if st.button("将本餐推荐推送到飞书", use_container_width=True):
+    if st.button(t("push_to_feishu"), use_container_width=True):
         if not st.session_state.get("demo_push"):
-            st.warning("请先执行本餐推荐流程。")
+            st.warning(t("need_push"))
         else:
-            content = "**测试消息：饮食计划推荐流程演示**\n\n" + st.session_state.get("demo_push_message", "")
+            service = get_demo_service()
+            push_message = service.format_push_message(st.session_state["demo_push"], locale=locale)
+            content = t("feishu_test_title") + push_message
             message_bundle = send_feishu_demo_bundle(
                 open_id,
                 content,
                 (st.session_state.get("demo_push") or {}).get("artifacts", {}),
+                locale=locale,
             )
             st.session_state["demo_message_id"] = message_bundle["main"]
             st.session_state["demo_message_bundle"] = message_bundle
             log_demo(f"已发送 demo 飞书消息，message_id={message_bundle['main']}")
 
     if st.session_state.get("demo_push"):
+        service = get_demo_service()
         live = st.session_state.get("demo_live", {})
+        push_message = service.format_push_message(st.session_state["demo_push"], locale=locale)
         if live.get("fallback_used"):
-            st.error("当前 demo 发生了回退，这不符合“全真实链路”要求。请重新执行并排查手机链路。")
+            st.error(t("fallback_error"))
         elif live.get("live_status") not in {"success", "partial"}:
-            st.warning(f"真实链路未完全打通：{live.get('live_status')} / {live.get('live_message', '')}")
-        st.markdown("**最终推送文案预览**")
-        st.markdown(st.session_state.get("demo_push_message", ""))
-        st.markdown("**执行结果 JSON**")
+            st.warning(t("live_warning", status=live.get("live_status"), message=live.get("live_message", "")))
+        st.markdown(t("push_preview"))
+        st.markdown(push_message)
+        st.markdown(t("live_json"))
         st.json(live)
         if st.session_state.get("demo_message_id"):
-            st.success(f"已发送飞书测试消息: {st.session_state['demo_message_id']}")
+            st.success(t("feishu_sent", message_id=st.session_state["demo_message_id"]))
         if st.session_state.get("demo_message_bundle"):
             st.json(st.session_state["demo_message_bundle"])
         llm_debug = st.session_state.get("demo_llm_debug")
         if llm_debug:
-            st.markdown("**LLM 执行过程**")
+            st.markdown(t("llm_process"))
             if llm_debug.get("status") == "error":
-                st.warning(f"LLM 调用失败: {llm_debug.get('error', '')}")
+                st.warning(t("llm_error", error=llm_debug.get("error", "")))
             elif llm_debug.get("status") == "empty":
-                st.warning("LLM 返回为空。")
+                st.warning(t("llm_empty"))
             else:
-                st.caption(f"模型: {llm_debug.get('model', 'unknown')}")
-            with st.expander("查看发给 LLM 的输入", expanded=False):
+                st.caption(t("llm_model", model=llm_debug.get("model", "unknown")))
+            with st.expander(t("llm_input"), expanded=False):
                 st.code(llm_debug.get("prompt", ""), language="text")
-            with st.expander("查看 LLM 输出", expanded=True):
+            with st.expander(t("llm_output"), expanded=True):
                 output = llm_debug.get("output", "")
                 if output:
                     st.markdown(output)
                 else:
-                    st.code("(empty output)", language="text")
+                    st.code(t("empty_output"), language="text")
     else:
-        st.info("点“执行本餐推荐流程”后，这里会展示完整推荐结果。")
+        st.info(t("result_empty"))
 
 st.divider()
 img_col1, img_col2, img_col3 = st.columns(3)
 artifacts = (st.session_state.get("demo_push") or {}).get("artifacts", {})
 with img_col1:
-    st.subheader("搜索结果页")
+    st.subheader(t("result_page"))
     result_path = artifacts.get("result_screenshot", "")
     if result_path and Path(result_path).exists():
         st.image(result_path, caption=Path(result_path).name)
     else:
-        st.caption("暂无截图")
+        st.caption(t("no_image"))
 with img_col2:
-    st.subheader("店铺页")
+    st.subheader(t("merchant_page"))
     merchant_path = artifacts.get("merchant_screenshot", "")
     if merchant_path and Path(merchant_path).exists():
         st.image(merchant_path, caption=Path(merchant_path).name)
     else:
-        st.caption("暂无截图")
+        st.caption(t("no_image"))
 with img_col3:
-    st.subheader("购物车页")
+    st.subheader(t("cart_page"))
     cart_path = artifacts.get("cart_screenshot", "")
     if cart_path and Path(cart_path).exists():
         st.image(cart_path, caption=Path(cart_path).name)
     else:
-        st.caption("暂无截图")
+        st.caption(t("no_image"))
 
 st.divider()
 left, right = st.columns(2)
 with left:
-    st.subheader("Demo 日志")
+    st.subheader(t("demo_log"))
     st.code(read_log_tail(DEMO_LOG), language="text")
 with right:
-    st.subheader("fsapp 日志")
+    st.subheader(t("fsapp_log"))
     st.code(read_log_tail(DEMO_FSAPP_LOG), language="text")

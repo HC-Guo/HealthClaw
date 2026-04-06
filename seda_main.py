@@ -375,36 +375,8 @@ def get_system_prompt(autonomous=False, user_query=""):
         prompt += "它们依赖浏览器连接，在后台运行时会导致卡死。\n"
 
     prompt += f"\nToday: {time.strftime('%Y-%m-%d %a')}\n"
-    prompt += _build_output_language_policy(user_query)
     prompt += get_global_memory(user_query=user_query)
     return prompt
-
-
-def _build_output_language_policy(user_query: str) -> str:
-    """
-    根据用户本轮输入附加输出语言约束。
-    目标：英文输入时优先英文回答；中文输入时优先中文回答；混合/不确定则保持默认。
-    """
-    q = (user_query or "").strip()
-    if not q:
-        return ""
-
-    cjk_count = len(re.findall(r"[\u4e00-\u9fff]", q))
-    en_word_count = len(re.findall(r"\b[a-zA-Z]{2,}\b", q))
-
-    if en_word_count >= 3 and en_word_count > cjk_count:
-        return (
-            "\n[Output Language Policy]\n"
-            "- The user's latest message is primarily in English.\n"
-            "- Respond in English by default, unless the user explicitly asks for another language.\n"
-        )
-    if cjk_count >= 2 and cjk_count >= en_word_count:
-        return (
-            "\n[输出语言策略]\n"
-            "- 用户本轮消息以中文为主。\n"
-            "- 默认使用中文回答；除非用户明确要求使用其他语言。\n"
-        )
-    return ""
 
 
 def _strip_autonomous_section(text):

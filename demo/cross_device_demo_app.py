@@ -58,6 +58,79 @@ YOUNG_BASE = "http://127.0.0.1:8787"
 ELDER_BASE = "http://127.0.0.1:8790"
 DEMO_SIGNAL_SCENARIOS = get_demo_signal_scenarios()
 
+UI_TEXT = {
+    "zh": {
+        "title": "HealthClaw跨设备演示",
+        "section_start": "1. 节点启动",
+        "start_young": "启动年轻人节点",
+        "start_elder": "启动老人节点",
+        "start_both": "一键启动两个节点",
+        "stop_both": "停止两个节点",
+        "reset_demo": "重置演示环境",
+        "young_health": "**年轻人节点健康状态**",
+        "elder_health": "**老人节点健康状态**",
+        "section_binding": "2. 绑定关系",
+        "binding_desc": "默认将老人节点 `elder_01` 与年轻人节点 `child_01` 建立通知关系。",
+        "bind_default": "建立默认绑定",
+        "refresh_bindings": "刷新绑定状态",
+        "current_bindings": "**当前绑定**",
+        "binding_read_error": "当前无法读取绑定: {error}",
+        "section_signal": "3. 模拟可穿戴异常信号",
+        "choose_scenario": "选择异常场景",
+        "sim_location": "模拟位置",
+        "sim_location_help": "演示版先手动模拟位置，后续可以直接替换为真实可穿戴设备上报的位置。",
+        "location_caption": "当前位置为演示定位字段，未来可直接替换为真实智能可穿戴设备上报的位置。",
+        "send_alert": "发送当前异常场景",
+        "send_safe": "发送当前正常样本",
+        "alert_payload": "**异常样本 payload**",
+        "safe_payload": "**正常样本 payload**",
+        "last_result": "**最近一次信号处理结果**",
+        "young_log": "年轻人节点日志",
+        "elder_log": "老人节点日志",
+        "young_start_result": "年轻人节点启动结果: {value}",
+        "elder_start_result": "老人节点启动结果: {value}",
+        "bind_result": "绑定结果: {value}",
+        "stop_result": "停止结果: {value}",
+        "reset_result": "重置结果: {value}",
+        "not_triggered": "not_triggered",
+    },
+    "en": {
+        "title": "HealthClaw Cross-device Demo",
+        "section_start": "1. Start Nodes",
+        "start_young": "Start young-side node",
+        "start_elder": "Start elder-side node",
+        "start_both": "Start both nodes",
+        "stop_both": "Stop both nodes",
+        "reset_demo": "Reset demo environment",
+        "young_health": "**Young-side node health**",
+        "elder_health": "**Elder-side node health**",
+        "section_binding": "2. Device Binding",
+        "binding_desc": "By default, this demo binds elder node `elder_01` to young-side node `child_01` for caregiver notifications.",
+        "bind_default": "Create default binding",
+        "refresh_bindings": "Refresh binding status",
+        "current_bindings": "**Current bindings**",
+        "binding_read_error": "Unable to read current bindings: {error}",
+        "section_signal": "3. Simulate Wearable Alerts",
+        "choose_scenario": "Choose alert scenario",
+        "sim_location": "Simulated location",
+        "sim_location_help": "This demo uses a manual location override for now and can later be replaced with a real wearable-reported location.",
+        "location_caption": "The location shown here is a demo field and can later be replaced by a real wearable-reported location.",
+        "send_alert": "Send alert sample",
+        "send_safe": "Send safe sample",
+        "alert_payload": "**Alert sample payload**",
+        "safe_payload": "**Safe sample payload**",
+        "last_result": "**Most recent signal result**",
+        "young_log": "Young-side node log",
+        "elder_log": "Elder-side node log",
+        "young_start_result": "Young-side node start result: {value}",
+        "elder_start_result": "Elder-side node start result: {value}",
+        "bind_result": "Binding result: {value}",
+        "stop_result": "Stop result: {value}",
+        "reset_result": "Reset result: {value}",
+        "not_triggered": "not_triggered",
+    },
+}
+
 
 def _load_optional_mykey_module():
     try:
@@ -188,13 +261,17 @@ def reset_demo_environment(stop_nodes=False):
     }
 
 
-def launch_process(cmd, log_path, pid_path):
+def launch_process(cmd, log_path, pid_path, env_overrides=None):
     with open(log_path, "ab") as log_file:
+        env = dict(os.environ)
+        if env_overrides:
+            env.update({str(k): str(v) for k, v in env_overrides.items()})
         proc = subprocess.Popen(
             cmd,
             cwd=str(PROJECT_ROOT),
             stdout=log_file,
             stderr=subprocess.STDOUT,
+            env=env,
         )
     pid_path.write_text(str(proc.pid), encoding="utf-8")
     return proc.pid
@@ -207,11 +284,16 @@ def safe_get_json(url):
         return {"status": "down", "msg": str(e)}
 
 
-def start_young_node():
+def start_young_node(locale="zh"):
     health = safe_get_json(YOUNG_BASE + "/healthz")
     if health.get("status") == "ok":
         return {"status": "already_running", "health": health}
-    pid = launch_process([sys.executable, "fsapp.py"], YOUNG_LOG, YOUNG_PID)
+    pid = launch_process(
+        [sys.executable, "fsapp.py"],
+        YOUNG_LOG,
+        YOUNG_PID,
+        env_overrides={"HEALTHCLAW_DEMO_LOCALE": locale},
+    )
     time.sleep(3)
     return {"status": "started", "pid": pid, "health": safe_get_json(YOUNG_BASE + "/healthz")}
 
@@ -277,75 +359,93 @@ def read_log_tail(path, lines=30):
     return "\n".join(text[-lines:])
 
 
-st.set_page_config(page_title="HealthClaw跨设备演示", layout="wide")
-st.title("HealthClaw跨设备演示")
+st.set_page_config(page_title="HealthClaw Cross-device Demo", layout="wide")
 
 ensure_demo_binding_file()
+
+if "cross_demo_locale" not in st.session_state:
+    st.session_state["cross_demo_locale"] = "zh"
+
+locale = st.selectbox(
+    "Language / 语言",
+    ["zh", "en"],
+    index=0 if st.session_state.get("cross_demo_locale", "zh") == "zh" else 1,
+    format_func=lambda value: "中文" if value == "zh" else "English",
+)
+st.session_state["cross_demo_locale"] = locale
+
+
+def t(key, **kwargs):
+    text = UI_TEXT[locale][key]
+    return text.format(**kwargs) if kwargs else text
+
+
+st.title(t("title"))
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.subheader("1. 节点启动")
-    if st.button("启动年轻人节点", use_container_width=True):
-        st.session_state["young_start"] = start_young_node()
-    if st.button("启动老人节点", use_container_width=True):
+    st.subheader(t("section_start"))
+    if st.button(t("start_young"), use_container_width=True):
+        st.session_state["young_start"] = start_young_node(locale=locale)
+    if st.button(t("start_elder"), use_container_width=True):
         st.session_state["elder_start"] = start_elder_node()
-    if st.button("一键启动两个节点", type="primary", use_container_width=True):
+    if st.button(t("start_both"), type="primary", use_container_width=True):
         st.session_state["reset_result"] = reset_demo_environment(stop_nodes=True)
-        st.session_state["young_start"] = start_young_node()
+        st.session_state["young_start"] = start_young_node(locale=locale)
         st.session_state["elder_start"] = start_elder_node()
-    if st.button("停止两个节点", use_container_width=True):
+    if st.button(t("stop_both"), use_container_width=True):
         young_stopped = stop_process(YOUNG_PID)
         elder_stopped = stop_process(ELDER_PID)
         st.session_state["stop_result"] = {
             "young_stopped": young_stopped,
             "elder_stopped": elder_stopped,
         }
-    if st.button("重置演示环境", use_container_width=True):
+    if st.button(t("reset_demo"), use_container_width=True):
         st.session_state["reset_result"] = reset_demo_environment(stop_nodes=False)
 
-    st.markdown("**年轻人节点健康状态**")
+    st.markdown(t("young_health"))
     st.json(safe_get_json(YOUNG_BASE + "/healthz"))
-    st.markdown("**老人节点健康状态**")
+    st.markdown(t("elder_health"))
     st.json(safe_get_json(ELDER_BASE + "/healthz"))
 
 with col2:
-    st.subheader("2. 绑定关系")
-    st.write("默认将老人节点 `elder_01` 与年轻人节点 `child_01` 建立通知关系。")
-    if st.button("建立默认绑定", use_container_width=True):
+    st.subheader(t("section_binding"))
+    st.write(t("binding_desc"))
+    if st.button(t("bind_default"), use_container_width=True):
         try:
             st.session_state["bind_result"] = bind_demo_nodes()
         except Exception as e:
             st.session_state["bind_result"] = {"status": "error", "msg": str(e)}
-    if st.button("刷新绑定状态", use_container_width=True):
+    if st.button(t("refresh_bindings"), use_container_width=True):
         try:
             st.session_state["bindings"] = get_bindings()
         except Exception as e:
             st.session_state["bindings"] = {"status": "error", "msg": str(e)}
 
-    st.markdown("**当前绑定**")
+    st.markdown(t("current_bindings"))
     try:
         st.json(get_bindings())
     except Exception as e:
-        st.warning(f"当前无法读取绑定: {e}")
+        st.warning(t("binding_read_error", error=e))
 
 with col3:
-    st.subheader("3. 模拟可穿戴异常信号")
+    st.subheader(t("section_signal"))
     scenario_keys = list(DEMO_SIGNAL_SCENARIOS.keys())
     scenario_key = st.selectbox(
-        "选择异常场景",
+        t("choose_scenario"),
         scenario_keys,
-        format_func=lambda key: DEMO_SIGNAL_SCENARIOS[key]["label"],
+        format_func=lambda key: DEMO_SIGNAL_SCENARIOS[key]["label_en"] if locale == "en" else DEMO_SIGNAL_SCENARIOS[key]["label"],
     )
     scenario = DEMO_SIGNAL_SCENARIOS[scenario_key]
-    alert_payload = build_demo_signal_payload(scenario_key, sender_id="elder_01", safe=False)
-    safe_payload = build_demo_signal_payload(scenario_key, sender_id="elder_01", safe=True)
+    alert_payload = build_demo_signal_payload(scenario_key, sender_id="elder_01", safe=False, locale=locale)
+    safe_payload = build_demo_signal_payload(scenario_key, sender_id="elder_01", safe=True, locale=locale)
     default_location_text = ((alert_payload.get("location") or {}).get("location_text") or "").strip()
     location_text = st.text_input(
-        "模拟位置",
+        t("sim_location"),
         value=default_location_text,
-        key=f"location_text_{scenario_key}",
-        help="演示版先手动模拟位置，后续可以直接替换为真实可穿戴设备上报的位置。",
+        key=f"location_text_{locale}_{scenario_key}",
+        help=t("sim_location_help"),
     ).strip()
     if location_text:
         for payload in [alert_payload, safe_payload]:
@@ -354,44 +454,45 @@ with col3:
             location.setdefault("source", "demo_manual_override")
             payload["location"] = location
 
-    if scenario["description"]:
-        st.info(scenario["description"])
-    st.caption("当前位置为演示定位字段，未来可直接替换为真实智能可穿戴设备上报的位置。")
-    if st.button("发送当前异常场景", type="primary", use_container_width=True):
+    scenario_description = scenario.get("description_en") if locale == "en" else scenario.get("description")
+    if scenario_description:
+        st.info(scenario_description)
+    st.caption(t("location_caption"))
+    if st.button(t("send_alert"), type="primary", use_container_width=True):
         try:
             st.session_state["signal_result"] = send_signal(alert_payload)
         except Exception as e:
             st.session_state["signal_result"] = {"status": "error", "msg": str(e)}
-    if st.button("发送当前正常样本", use_container_width=True):
+    if st.button(t("send_safe"), use_container_width=True):
         try:
             st.session_state["signal_result"] = send_signal(safe_payload)
         except Exception as e:
             st.session_state["signal_result"] = {"status": "error", "msg": str(e)}
-    st.markdown("**异常样本 payload**")
+    st.markdown(t("alert_payload"))
     st.json(alert_payload)
-    st.markdown("**正常样本 payload**")
+    st.markdown(t("safe_payload"))
     st.json(safe_payload)
 
-    st.markdown("**最近一次信号处理结果**")
-    st.json(st.session_state.get("signal_result", {"status": "not_triggered"}))
+    st.markdown(t("last_result"))
+    st.json(st.session_state.get("signal_result", {"status": t("not_triggered")}))
 
 st.divider()
 
 left, right = st.columns(2)
 with left:
-    st.subheader("年轻人节点日志")
+    st.subheader(t("young_log"))
     st.code(read_log_tail(YOUNG_LOG), language="text")
 with right:
-    st.subheader("老人节点日志")
+    st.subheader(t("elder_log"))
     st.code(read_log_tail(ELDER_LOG), language="text")
 
 if "young_start" in st.session_state:
-    st.info(f"年轻人节点启动结果: {st.session_state['young_start']}")
+    st.info(t("young_start_result", value=st.session_state["young_start"]))
 if "elder_start" in st.session_state:
-    st.info(f"老人节点启动结果: {st.session_state['elder_start']}")
+    st.info(t("elder_start_result", value=st.session_state["elder_start"]))
 if "bind_result" in st.session_state:
-    st.success(f"绑定结果: {st.session_state['bind_result']}")
+    st.success(t("bind_result", value=st.session_state["bind_result"]))
 if "stop_result" in st.session_state:
-    st.warning(f"停止结果: {st.session_state['stop_result']}")
+    st.warning(t("stop_result", value=st.session_state["stop_result"]))
 if "reset_result" in st.session_state:
-    st.info(f"重置结果: {st.session_state['reset_result']}")
+    st.info(t("reset_result", value=st.session_state["reset_result"]))

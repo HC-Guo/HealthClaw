@@ -27,6 +27,16 @@ phone_control(action="launch_app", app="美团")
   - 原因：该包名的默认Activity可能不存在或需要额外参数
   - 实践经验：多次测试失败，报错"MainActivity not found"
 
+**成功案例：**
+上次成功启动使用的是桌面点击法（因为launch_app失败），但推荐先尝试 `app="美团"` 参数，这是最简洁的方式。
+
+**备选方法：桌面点击（launch_app失败时）**
+```python
+1. phone_control(action="press_key", key="home")  # 返回桌面
+2. phone_screen_analyze(question="桌面上美团或美团外卖图标的坐标？")
+3. phone_control(action="tap", x=坐标x, y=坐标y)
+```
+
 等待2秒让App加载。
 
 ### 3. 进入订单列表
@@ -41,10 +51,9 @@ phone_screen_analyze(question="当前是什么页面？如何进入订单列表�
 - 美团主App：进入"我的" → "全部订单"
 
 **关键原则：不要硬编码坐标！**
-1. 优先使用原子动作：`phone_control(action="tap_keyword_confirm", keyword="订单")` 或 `keyword="全部订单"`（内部已封装 `ui_dump -> 点击 -> 确认`）
-2. 若原子动作返回未命中/不确定，再用 `ui_dump(keyword="订单", clickable_only=true)` 手动定位并点击
-3. 只有在 `ui_dump` 无法定位时，才使用 `phone_screen_analyze` 视觉兜底
-4. 点击后用 `phone_screen_analyze` 做一次最终页面确认（是否已进入订单列表）
+1. 先用 `ui_dump(keyword="订单")` 尝试找坐标
+2. 找不到就用 `phone_screen_analyze` 识别位置
+3. 点击后用 `phone_screen_analyze` 确认是否进入订单页
 
 ### 4. 收集订单信息
 
@@ -145,7 +154,7 @@ phone_screen_analyze(question="列出当前屏幕所有订单：时间、店名�
 - 不要重复截图同一屏幕
 
 ### 🔧 错误处理
-- **启动失败**：改用包名重试（`app="com.sankuai.meituan"`），并用 `current_app` 检查前台应用
+- **启动失败**：改用桌面点击法
 - **找不到按钮**：用 `phone_screen_analyze` 动态定位
 - **App闪退**：重新启动，多次失败询问用户
 - **误触支付**：立即 `press_key(back)` 返回

@@ -1,11 +1,12 @@
 """
-Self-Evolving MedicalClaw — 飞书 Bot 前端
+Self-Evolving HealthClaw — 飞书 Bot 前端
 双模式：WebSocket 事件推送 + API 轮询回退。
 启动: python fsapp.py
 """
 import os, sys, threading, time, re, json, glob, urllib.request
 import importlib.util
 import queue as Q
+from PIL import Image
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
@@ -93,6 +94,24 @@ _alert_llm_state = {
 }
 
 
+def _startup_locale():
+    return "en" if str(os.environ.get("HEALTHCLAW_DEMO_LOCALE", "") or "").strip().lower().startswith("en") else "zh"
+
+
+def _startup_online_text(polling=False):
+    if _startup_locale() == "en":
+        if polling:
+            return "🩺 HealthClaw is online (polling mode). You can start chatting now!"
+        return "🩺 HealthClaw is online. You can start chatting now!"
+    if polling:
+        return "🩺 HealthClaw 已上线（轮询模式），可以开始对话！"
+    return "🩺 HealthClaw 已上线，可以开始对话！"
+
+
+def _feishu_application_lang():
+    return "en_us" if _startup_locale() == "en" else "zh_cn"
+
+
 def ensure_agent_ready():
     global agent, agent_init_error
     if agent is not None:
@@ -113,6 +132,13 @@ def ensure_agent_ready():
 def _coerce_int(value, default=0):
     try:
         return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _coerce_float(value, default=0.0):
+    try:
+        return float(value)
     except (TypeError, ValueError):
         return default
 
@@ -189,9 +215,47 @@ def _build_direct_fallback_result(alert, error_text="", source="fallback"):
     }
 
 
+def _alert_locale(alert):
+    if not isinstance(alert, dict):
+        return "zh"
+    locale = alert.get("locale")
+    if not locale and isinstance(alert.get("details"), dict):
+        locale = alert["details"].get("locale")
+    return "en" if str(locale or "").strip().lower().startswith("en") else "zh"
+
+
 def build_alert_explanation_prompt(alert):
+    locale = _alert_locale(alert)
     alert_json = json.dumps(alert, ensure_ascii=False, indent=2)
     location_text = _extract_alert_location_text(alert)
+    if locale == "en":
+        location_hint = ""
+        if location_text:
+            location_hint = (
+                f"9. If the alert already includes a location (currently: {location_text}), "
+                "remind the family to contact the closest available person near that location first.\n\n"
+            )
+        return (
+            "You are HealthClaw's caregiver alert explainer. "
+            "Your job is not to decide whether the alert is valid again, but to explain an already-triggered alert to a family member without a medical background.\n\n"
+            "Requirements:\n"
+            "1. Explain only from the provided alert data. Do not invent vitals, location details, history, or test results.\n"
+            "2. Use plain English and avoid heavy medical jargon.\n"
+            "3. Do not give a definitive diagnosis. Use language such as 'may', 'could', 'worth watching', or 'should be confirmed'.\n"
+            "4. Output Markdown and include exactly these 4 headings:\n"
+            "**What This Means**\n"
+            "**Possible Reasons**\n"
+            "**What To Do Now**\n"
+            "**When To Call Emergency Help**\n"
+            "5. Under each heading, write 2-4 short bullet points.\n"
+            "6. If the data is limited, explicitly say that the alert alone is not enough to determine the cause.\n"
+            "7. For high heart rate alerts, remind the family to distinguish a brief post-activity spike from a sustained resting elevation.\n\n"
+            "8. Alerts may come from wearable heart rate, oxygen, fall, rhythm, temperature, or activity signals, so the explanation should match the signal type.\n\n"
+            f"{location_hint}"
+            "Alert data:\n"
+            f"```json\n{alert_json}\n```"
+        )
+
     location_hint = ""
     if location_text:
         location_hint = (
@@ -220,7 +284,201 @@ def build_alert_explanation_prompt(alert):
     )
 
 
+def _build_fallback_alert_explanation_en(alert):
+    event_type = str(alert.get("event_type", "external_alert") or "external_alert")
+    details = alert.get("details") if isinstance(alert.get("details"), dict) else {}
+    heart_rate = _coerce_int(details.get("heart_rate", alert.get("heart_rate")), 0)
+    duration_sec = _coerce_int(details.get("duration_sec", alert.get("duration_sec")), 0)
+    threshold = _coerce_int((details.get("rule") or {}).get("threshold"), 0)
+    spo2 = _coerce_int(details.get("spo2", alert.get("spo2")), 0)
+    impact_g = _coerce_float(details.get("impact_g", alert.get("impact_g")), 0.0)
+    no_movement_sec = _coerce_int(details.get("no_movement_sec", alert.get("no_movement_sec")), 0)
+    episode_count = _coerce_int(details.get("episode_count", alert.get("episode_count")), 0)
+    resting_heart_rate = _coerce_int(details.get("resting_heart_rate", alert.get("resting_heart_rate")), 0)
+    body_temperature = _coerce_float(details.get("body_temperature", alert.get("body_temperature")), 0.0)
+    inactivity_minutes = _coerce_int(details.get("inactivity_minutes", alert.get("inactivity_minutes")), 0)
+    threshold_minutes = _coerce_int((details.get("rule") or {}).get("threshold_minutes"), 0)
+    classification = str(details.get("classification", "") or "")
+
+    if event_type == "heart_rate_alert":
+        threshold_text = f"{threshold} bpm" if threshold > 0 else "the configured threshold"
+        return "\n".join(
+            [
+                "**What This Means**",
+                f"- The wearable detected a heart rate around {heart_rate} bpm for about {duration_sec} seconds, which is above the alert rule.",
+                "- That means the older adult is worth checking on soon, but this alert alone is not enough to identify the exact cause.",
+                "- A sustained elevation at rest is usually more concerning than a brief spike right after activity.",
+                "",
+                "**Possible Reasons**",
+                "- This could reflect recent movement, stress, pain, fever, dehydration, or a loose wearable reading.",
+                f"- It could also reflect an arrhythmia or other acute discomfort, but the alert alone cannot confirm that and only shows a sustained rate above {threshold_text}.",
+                "",
+                "**What To Do Now**",
+                "- Contact the older adult and confirm they are awake, speaking normally, and not alone.",
+                "- Ask about chest discomfort, shortness of breath, dizziness, palpitations, a fall, or clear weakness.",
+                "- If possible, repeat the heart rate check after a short rest and see whether it comes down quickly.",
+                "",
+                "**When To Call Emergency Help**",
+                "- Call emergency help right away if the alert comes with chest pain, severe shortness of breath, fainting, confusion, or one-sided weakness.",
+                "- If the heart rate stays very high at rest and does not come down on repeat checks, urgent in-person care is also appropriate.",
+                "- If the device keeps sending high-risk alerts and the family cannot reach the older adult, treat it as an emergency.",
+            ]
+        )
+
+    if event_type == "blood_oxygen_alert":
+        return "\n".join(
+            [
+                "**What This Means**",
+                f"- The wearable detected oxygen saturation around {spo2}% for about {duration_sec} seconds, which can suggest breathing or circulation risk.",
+                "- This alert alone is not enough to determine the cause, but sustained low oxygen deserves more attention than a brief fluctuation.",
+                "",
+                "**Possible Reasons**",
+                "- This could reflect a respiratory infection, COPD or asthma worsening, another lung issue, or a temporary measurement error.",
+                "- Loose device fit or movement during the reading can also cause a false alarm, so a repeat check matters.",
+                "",
+                "**What To Do Now**",
+                "- Contact the older adult and ask about shortness of breath, chest tightness, fast breathing, blue lips, or unusual fatigue.",
+                "- Ask them to sit upright, stay calm, and repeat the oxygen reading if possible.",
+                "- If home oxygen or prior respiratory history exists, share that information with whoever can check on them in person.",
+                "",
+                "**When To Call Emergency Help**",
+                "- Call emergency help if there is obvious breathing distress, blue lips, confusion, or the older adult cannot speak normally.",
+                "- If repeat checks stay very low or the family cannot reach the older adult at all, treat it as urgent.",
+            ]
+        )
+
+    if event_type == "fall_detected_alert":
+        return "\n".join(
+            [
+                "**What This Means**",
+                f"- The wearable detected a possible fall with about {impact_g:.1f}g of impact and about {no_movement_sec} seconds without clear movement afterward.",
+                "- Fall alerts usually deserve faster on-site confirmation than a single abnormal vital sign because injuries can be hidden.",
+                "",
+                "**Possible Reasons**",
+                "- This may be a true fall, a slip while standing up, or occasionally a strong device impact that caused a false alarm.",
+                "- If there was prolonged stillness afterward, worry more about the older adult being unable to get up alone.",
+                "",
+                "**What To Do Now**",
+                "- Contact the older adult or the nearest caregiver immediately and confirm whether they are awake, speaking, and in pain.",
+                "- If someone is already there, do not force them up immediately before checking for head injury, deformity, or severe pain.",
+                "- If they cannot stand, have strong pain, or may have hit their head, arrange in-person help quickly.",
+                "",
+                "**When To Call Emergency Help**",
+                "- Call emergency help right away for loss of consciousness, head injury, suspected fracture, vomiting, or inability to stand.",
+                "- If the device keeps showing a post-fall no-movement state and no one can reach the older adult, treat it as an emergency.",
+            ]
+        )
+
+    if event_type == "arrhythmia_alert":
+        return "\n".join(
+            [
+                "**What This Means**",
+                f"- The wearable flagged a possible irregular rhythm for about {duration_sec} seconds with about {episode_count} abnormal rhythm segments.",
+                f"- Resting heart rate is around {resting_heart_rate} bpm." if resting_heart_rate > 0 else "- The alert suggests rhythm instability worth checking, but it is not a confirmed diagnosis by itself.",
+                "- The alert suggests rhythm instability worth checking, but it is not a confirmed diagnosis by itself." if resting_heart_rate > 0 else "",
+                "",
+                "**Possible Reasons**",
+                "- This could reflect atrial fibrillation or another rhythm issue, but it can also come from wearable signal noise or a temporary rhythm disturbance.",
+                "- The alert alone is not enough to determine the exact rhythm problem without symptoms and a formal ECG.",
+                "",
+                "**What To Do Now**",
+                "- Contact the older adult and ask about palpitations, dizziness, chest discomfort, shortness of breath, or near-fainting.",
+                "- Ask them to stop activity, sit down, rest, and repeat the reading if possible.",
+                "- If there is prior ECG history or medication information, keep it ready for whoever follows up.",
+                "",
+                "**When To Call Emergency Help**",
+                "- Call emergency help right away if the alert comes with fainting, severe shortness of breath, confusion, or ongoing chest pain.",
+                "- If repeated irregular rhythm alerts continue and the older adult cannot be reached, arrange urgent on-site confirmation.",
+            ]
+        ).replace("\n- \n", "\n")
+
+    if event_type == "temperature_alert":
+        if classification == "low_temperature":
+            return "\n".join(
+                [
+                    "**What This Means**",
+                    f"- The wearable suggests a low body temperature around {body_temperature:.1f}C.",
+                    "- Low temperature in an older adult can matter even when the cause is not yet clear.",
+                    "",
+                    "**Possible Reasons**",
+                    "- This can happen with cold environment exposure, poor intake, infection, or a general decline in condition.",
+                    "- Device error is also possible, so a repeat temperature check is important.",
+                    "",
+                    "**What To Do Now**",
+                    "- Contact the older adult, confirm their mental status, and ask whether they feel cold, weak, or shaky.",
+                    "- Repeat the temperature if possible and help them stay warm while arranging in-person follow-up if needed.",
+                    "",
+                    "**When To Call Emergency Help**",
+                    "- Call emergency help if there is confusion, extreme weakness, slowed breathing, or no one can reach the older adult.",
+                    "- If repeat checks still show low temperature, urgent in-person assessment is reasonable.",
+                ]
+            )
+        return "\n".join(
+            [
+                "**What This Means**",
+                f"- The wearable suggests a high body temperature around {body_temperature:.1f}C, which may reflect fever or an acute inflammatory process.",
+                "- Fever does not automatically mean severe illness, but in older adults it can come with dehydration or mental status changes more easily.",
+                "",
+                "**Possible Reasons**",
+                "- This could reflect a respiratory infection, urinary infection, another inflammatory issue, or sometimes environmental heat or a measurement error.",
+                "- Symptoms such as cough, chills, painful urination, or low fluid intake make a true fever more likely.",
+                "",
+                "**What To Do Now**",
+                "- Contact the older adult and ask about chills, cough, breathing changes, painful urination, weakness, or reduced drinking.",
+                "- Repeat the temperature, encourage fluids if appropriate, and arrange an in-person check if the older adult seems worse.",
+                "",
+                "**When To Call Emergency Help**",
+                "- Call emergency help if there is confusion, severe shortness of breath, persistent vomiting, or inability to get up.",
+                "- If the family cannot reach the older adult or the temperature stays very high on repeat checks, escalate quickly.",
+            ]
+        )
+
+    if event_type == "inactivity_alert":
+        return "\n".join(
+            [
+                "**What This Means**",
+                f"- The wearable detected about {inactivity_minutes} minutes without meaningful movement, which is beyond the alert threshold of about {threshold_minutes} minutes.",
+                "- This does not automatically mean an emergency, but it is worth checking if the older adult would not normally stay still that long.",
+                "",
+                "**Possible Reasons**",
+                "- This may simply reflect a nap, watching TV, taking the device off, or a tracking gap.",
+                "- It could also reflect a fall, acute illness, reduced consciousness, or the older adult being unable to get up.",
+                "",
+                "**What To Do Now**",
+                "- Contact the older adult and confirm whether they are awake, responding normally, and simply resting.",
+                "- If they live alone, ask a nearby family member, neighbor, or caregiver to check in person soon.",
+                "",
+                "**When To Call Emergency Help**",
+                "- Treat it as urgent if there is prolonged inactivity together with no response from the older adult.",
+                "- If an in-person check finds abnormal breathing, altered consciousness, or inability to get up, call emergency help immediately.",
+            ]
+        )
+
+    return "\n".join(
+        [
+            "**What This Means**",
+            "- HealthClaw detected a health-related alert that deserves caregiver attention.",
+            "- The alert alone is not enough to determine the exact cause without checking the older adult directly.",
+            "",
+            "**Possible Reasons**",
+            "- The signal may reflect activity, device noise, or a real physical problem.",
+            "- Symptoms, duration, and repeat measurements are all needed to judge risk more accurately.",
+            "",
+            "**What To Do Now**",
+            "- Contact the older adult soon and confirm they are awake, responsive, and not alone.",
+            "- Ask about chest discomfort, breathing changes, dizziness, pain, a fall, or any other obvious problem.",
+            "- If practical, repeat the relevant measurement and see whether it improves.",
+            "",
+            "**When To Call Emergency Help**",
+            "- Call emergency help if there is altered consciousness, major breathing trouble, chest pain, injury after a fall, or no response from the older adult.",
+            "- If alerts keep repeating together with clear symptoms, urgent in-person care is appropriate.",
+        ]
+    )
+
+
 def build_fallback_alert_explanation(alert):
+    if _alert_locale(alert) == "en":
+        return _build_fallback_alert_explanation_en(alert)
     event_type = str(alert.get("event_type", "external_alert") or "external_alert")
     details = alert.get("details") if isinstance(alert.get("details"), dict) else {}
     heart_rate = _coerce_int(details.get("heart_rate", alert.get("heart_rate")), 0)
@@ -533,7 +791,13 @@ def send_message(open_id, content, msg_type="text", use_card=False):
 def upload_image(image_path):
     from lark_oapi.api.im.v1 import CreateImageRequest, CreateImageRequestBody
 
-    with open(image_path, "rb") as image_file:
+    src = os.path.abspath(image_path)
+    stem, _ext = os.path.splitext(os.path.basename(src))
+    prepared_path = os.path.join(PROJECT_ROOT, "temp", f"{stem}_feishu.jpg")
+    with Image.open(src) as image:
+        image.convert("RGB").save(prepared_path, format="JPEG", quality=92, optimize=True)
+
+    with open(prepared_path, "rb") as image_file:
         body = CreateImageRequestBody.builder() \
             .image_type("message") \
             .image(image_file) \
@@ -616,6 +880,7 @@ def _extract_alert_location_text(alert):
 
 
 def _format_external_alert(alert, explanation=None, explanation_source="", explanation_pending=False):
+    locale = _alert_locale(alert)
     event_type = alert.get("event_type", "external_alert")
     sender_id = alert.get("sender_id", "unknown")
     timestamp = alert.get("timestamp", time.strftime("%Y-%m-%d %H:%M:%S"))
@@ -624,27 +889,44 @@ def _format_external_alert(alert, explanation=None, explanation_source="", expla
     details = alert.get("details")
     location_text = _extract_alert_location_text(alert)
 
-    lines = [
-        "**跨设备告警通知**",
-        f"事件类型: `{event_type}`",
-        f"来源设备: `{sender_id}`",
-        f"告警等级: `{severity}`",
-        f"时间: `{timestamp}`",
-    ]
+    if locale == "en":
+        lines = [
+            "**Cross-device Alert**",
+            f"Event type: `{event_type}`",
+            f"Source device: `{sender_id}`",
+            f"Severity: `{severity}`",
+            f"Time: `{timestamp}`",
+        ]
+    else:
+        lines = [
+            "**跨设备告警通知**",
+            f"事件类型: `{event_type}`",
+            f"来源设备: `{sender_id}`",
+            f"告警等级: `{severity}`",
+            f"时间: `{timestamp}`",
+        ]
     if location_text:
-        lines.append(f"定位: `{location_text}`")
+        lines.append(f"Location: `{location_text}`" if locale == "en" else f"定位: `{location_text}`")
     lines.extend(["", message])
     if explanation_pending:
-        lines.extend(["", "_HealthClaw 正在补充这条告警的含义解读，请稍候..._"])
+        lines.extend(
+            ["", "_HealthClaw is preparing an explanation for this alert. Please wait a moment..._"]
+            if locale == "en"
+            else ["", "_HealthClaw 正在补充这条告警的含义解读，请稍候..._"]
+        )
     elif explanation:
-        title = "**HealthClaw 解读**"
+        title = "**HealthClaw Interpretation**" if locale == "en" else "**HealthClaw 解读**"
         if explanation_source == "fallback_auth_invalid":
-            title = "**HealthClaw 基础解读（LLM 暂不可用）**"
+            title = "**HealthClaw Baseline Interpretation (LLM temporarily unavailable)**" if locale == "en" else "**HealthClaw 基础解读（LLM 暂不可用）**"
         elif explanation_source == "fallback":
-            title = "**HealthClaw 基础解读**"
+            title = "**HealthClaw Baseline Interpretation**" if locale == "en" else "**HealthClaw 基础解读**"
         lines.extend(["", title, explanation.strip()])
         if explanation_source == "fallback_auth_invalid":
-            lines.append("_当前已自动切换为规则增强解读，待 LLM 凭证恢复后会自动恢复实时生成。_")
+            lines.append(
+                "_HealthClaw has automatically switched to rule-enhanced fallback interpretation and will return to live LLM generation once credentials recover._"
+                if locale == "en"
+                else "_当前已自动切换为规则增强解读，待 LLM 凭证恢复后会自动恢复实时生成。_"
+            )
     if details:
         details_text = json.dumps(details, ensure_ascii=False, indent=2)
         lines.extend(["", f"```json\n{details_text}\n```"])
@@ -889,7 +1171,7 @@ def handle_command(open_id, cmd):
 
     elif cmd == "/help":
         send_message(open_id, (
-            "📖 MedicalClaw 飞书 Bot 命令:\n"
+            "📖 HealthClaw 飞书 Bot 命令:\n"
             "/stop — 停止当前任务\n"
             "/status — 查看运行状态\n"
             "/restore — 恢复上次对话历史\n"
@@ -1028,7 +1310,7 @@ class MessagePoller:
         """通过给用户发空消息获取 chat_id（实际用 list messages 接口发现）"""
         if open_id in self.known_chats:
             return self.known_chats[open_id]
-        msg_id = send_message(open_id, "🩺 MedicalClaw 已上线，可以开始对话！")
+        msg_id = send_message(open_id, _startup_online_text())
         if msg_id:
             try:
                 result = self._api_get(
@@ -1068,7 +1350,7 @@ class MessagePoller:
         """使用应用信息中的 owner_id 发现 P2P 会话"""
         try:
             result = self._api_get(
-                f'https://open.feishu.cn/open-apis/application/v6/applications/{APP_ID}?lang=zh_cn')
+                f'https://open.feishu.cn/open-apis/application/v6/applications/{APP_ID}?lang={_feishu_application_lang()}')
             owner_id = result.get('data', {}).get('app', {}).get('owner', {}).get('owner_id', '')
             if owner_id:
                 print(f"[飞书-Poll] 应用 Owner: {owner_id}")
@@ -1076,7 +1358,7 @@ class MessagePoller:
                 data_body = json.dumps({
                     'receive_id': owner_id,
                     'msg_type': 'text',
-                    'content': json.dumps({"text": "🩺 MedicalClaw 已上线（轮询模式），可以开始对话！"})
+                    'content': json.dumps({"text": _startup_online_text(polling=True)})
                 }).encode()
                 req = urllib.request.Request(
                     'https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id',
@@ -1186,7 +1468,7 @@ def main():
     )
 
     print("=" * 50)
-    print("  🩺 Self-Evolving MedicalClaw — 飞书 Bot")
+    print("  🩺 Self-Evolving HealthClaw — 飞书 Bot")
     print(f"  App ID: {APP_ID}")
     print(f"  授权用户: {ALLOWED_USERS or '全部'}")
     print("  模式: WebSocket + 轮询回退")

@@ -66,15 +66,15 @@ when dinner time hits, it does not stop at one suggestion—it searches delivery
 
 <p align="center">
   <video
-    poster="./docs/readme_media/one_click_health_demo_cover_en.png"
-    src="https://github.com/user-attachments/assets/06e6d9fa-b3f1-4542-93c7-be3b91b7aca3"
+    poster="./docs/readme_media/one_click_health_demo_cover.png"
+    src="https://github.com/user-attachments/assets/a3ae7af3-3176-475c-90a9-2dfc97c30a81"
     controls
     muted
     playsinline
     preload="metadata"
     width="800"
   >
-    If the player does not appear, <a href="https://github.com/user-attachments/assets/06e6d9fa-b3f1-4542-93c7-be3b91b7aca3">open the video directly</a>.
+    If the player does not appear, <a href="https://github.com/user-attachments/assets/a3ae7af3-3176-475c-90a9-2dfc97c30a81">open the video directly</a>.
   </video>
 </p>
 
@@ -87,15 +87,15 @@ it reads device-side data in order and produces one consolidated report—scores
 
 <p align="center">
   <video
-    poster="./docs/readme_media/showcase_risk_prediction_cover_en.png"
-    src="https://github.com/user-attachments/assets/2bd61616-43d1-4a54-a4b6-7acfa6a43394"
+    poster="./docs/readme_media/showcase_risk_prediction_cover.png"
+    src="https://github.com/user-attachments/assets/f096dd86-905e-451d-a577-b1d4e5613ebc"
     controls
     muted
     playsinline
     preload="metadata"
     width="800"
   >
-    If the player does not appear, <a href="https://github.com/user-attachments/assets/2bd61616-43d1-4a54-a4b6-7acfa6a43394">open the video directly</a>.
+    If the player does not appear, <a href="https://github.com/user-attachments/assets/f096dd86-905e-451d-a577-b1d4e5613ebc">open the video directly</a>.
   </video>
 </p>
 

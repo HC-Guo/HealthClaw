@@ -17,44 +17,68 @@ DEFAULT_BINDINGS_PATH = "memory/device_bindings.json"
 DEMO_LOCATION_PRESETS = {
     "heart_rate_spike": {
         "location_text": "复旦大学邯郸校区 6 号楼 203 室",
+        "location_text_en": "Room 203, Building 6, Handan Campus, Fudan University",
         "campus": "复旦大学邯郸校区",
+        "campus_en": "Handan Campus, Fudan University",
         "building": "6 号楼",
+        "building_en": "Building 6",
         "room": "203 室",
+        "room_en": "Room 203",
         "source": "demo_simulated_wearable_location",
     },
     "low_oxygen": {
         "location_text": "复旦大学邯郸校区 5 号楼 305 室",
+        "location_text_en": "Room 305, Building 5, Handan Campus, Fudan University",
         "campus": "复旦大学邯郸校区",
+        "campus_en": "Handan Campus, Fudan University",
         "building": "5 号楼",
+        "building_en": "Building 5",
         "room": "305 室",
+        "room_en": "Room 305",
         "source": "demo_simulated_wearable_location",
     },
     "fall_detected": {
         "location_text": "复旦大学邯郸校区 2 号楼 102 室门口走廊",
+        "location_text_en": "Hallway outside Room 102, Building 2, Handan Campus, Fudan University",
         "campus": "复旦大学邯郸校区",
+        "campus_en": "Handan Campus, Fudan University",
         "building": "2 号楼",
+        "building_en": "Building 2",
         "room": "102 室门口",
+        "room_en": "Outside Room 102",
         "source": "demo_simulated_wearable_location",
     },
     "irregular_rhythm": {
         "location_text": "复旦大学邯郸校区 4 号楼 301 室",
+        "location_text_en": "Room 301, Building 4, Handan Campus, Fudan University",
         "campus": "复旦大学邯郸校区",
+        "campus_en": "Handan Campus, Fudan University",
         "building": "4 号楼",
+        "building_en": "Building 4",
         "room": "301 室",
+        "room_en": "Room 301",
         "source": "demo_simulated_wearable_location",
     },
     "high_temperature": {
         "location_text": "复旦大学邯郸校区 7 号楼 318 室",
+        "location_text_en": "Room 318, Building 7, Handan Campus, Fudan University",
         "campus": "复旦大学邯郸校区",
+        "campus_en": "Handan Campus, Fudan University",
         "building": "7 号楼",
+        "building_en": "Building 7",
         "room": "318 室",
+        "room_en": "Room 318",
         "source": "demo_simulated_wearable_location",
     },
     "prolonged_inactivity": {
         "location_text": "复旦大学邯郸校区 8 号楼 206 室",
+        "location_text_en": "Room 206, Building 8, Handan Campus, Fudan University",
         "campus": "复旦大学邯郸校区",
+        "campus_en": "Handan Campus, Fudan University",
         "building": "8 号楼",
+        "building_en": "Building 8",
         "room": "206 室",
+        "room_en": "Room 206",
         "source": "demo_simulated_wearable_location",
     },
 }
@@ -63,7 +87,9 @@ DEMO_LOCATION_PRESETS = {
 DEMO_SIGNAL_SCENARIOS = {
     "heart_rate_spike": {
         "label": "心率持续过快",
+        "label_en": "Sustained high heart rate",
         "description": "",
+        "description_en": "",
         "alert_payload": {
             "signal_type": "heart_rate",
             "heart_rate": 145,
@@ -85,7 +111,9 @@ DEMO_SIGNAL_SCENARIOS = {
     },
     "low_oxygen": {
         "label": "血氧持续偏低",
+        "label_en": "Sustained low oxygen",
         "description": "模拟可穿戴设备检测到血氧持续低于安全阈值。",
+        "description_en": "Simulates a wearable device reporting oxygen saturation below the safety threshold for a sustained period.",
         "alert_payload": {
             "signal_type": "blood_oxygen",
             "spo2": 88,
@@ -105,7 +133,9 @@ DEMO_SIGNAL_SCENARIOS = {
     },
     "fall_detected": {
         "label": "疑似跌倒",
+        "label_en": "Possible fall detected",
         "description": "模拟手表/胸牌检测到跌倒冲击并且老人短时间内没有恢复活动。",
+        "description_en": "Simulates a watch or badge detecting a fall impact and no meaningful movement shortly afterward.",
         "alert_payload": {
             "signal_type": "fall_detected",
             "fall_detected": True,
@@ -125,7 +155,9 @@ DEMO_SIGNAL_SCENARIOS = {
     },
     "irregular_rhythm": {
         "label": "疑似心律不齐",
+        "label_en": "Possible irregular rhythm",
         "description": "模拟可穿戴 ECG 或脉搏节律算法提示可能存在心律不齐。",
+        "description_en": "Simulates a wearable ECG or pulse rhythm algorithm flagging a possible irregular rhythm.",
         "alert_payload": {
             "signal_type": "irregular_rhythm",
             "irregular_rhythm_detected": True,
@@ -147,7 +179,9 @@ DEMO_SIGNAL_SCENARIOS = {
     },
     "high_temperature": {
         "label": "体温异常升高",
+        "label_en": "Abnormally high temperature",
         "description": "模拟可穿戴体温传感器提示持续发热。",
+        "description_en": "Simulates a wearable temperature sensor reporting sustained fever.",
         "alert_payload": {
             "signal_type": "body_temperature",
             "body_temperature": 39.1,
@@ -169,7 +203,9 @@ DEMO_SIGNAL_SCENARIOS = {
     },
     "prolonged_inactivity": {
         "label": "长时间无活动",
+        "label_en": "Prolonged inactivity",
         "description": "模拟老人佩戴设备连续数小时无明显活动。",
+        "description_en": "Simulates several hours of minimal movement detected by the wearable.",
         "alert_payload": {
             "signal_type": "inactivity",
             "inactivity_minutes": 180,
@@ -190,16 +226,107 @@ DEMO_SIGNAL_SCENARIOS = {
 }
 
 
+def _normalize_demo_locale(locale):
+    return "en" if str(locale or "").strip().lower().startswith("en") else "zh"
+
+
+def _localized_demo_location(location, locale):
+    loc = _normalize_demo_locale(locale)
+    if loc != "en":
+        return {
+            "location_text": location.get("location_text", ""),
+            "campus": location.get("campus", ""),
+            "building": location.get("building", ""),
+            "room": location.get("room", ""),
+            "source": location.get("source", ""),
+        }
+    return {
+        "location_text": location.get("location_text_en") or location.get("location_text", ""),
+        "campus": location.get("campus_en") or location.get("campus", ""),
+        "building": location.get("building_en") or location.get("building", ""),
+        "room": location.get("room_en") or location.get("room", ""),
+        "source": location.get("source", ""),
+    }
+
+
+def _build_demo_signal_message(scenario_key, payload, safe, locale):
+    loc = _normalize_demo_locale(locale)
+    if loc != "en":
+        return ""
+    if scenario_key == "heart_rate_spike":
+        if safe:
+            return (
+                f"Current heart rate is {payload.get('heart_rate', 0)} bpm for {payload.get('duration_sec', 0)}s, "
+                "which is still below the alert threshold."
+            )
+        return (
+            f"Sustained high heart rate detected ({payload.get('heart_rate', 0)} bpm for {payload.get('duration_sec', 0)}s). "
+            "Please check on the older adult soon."
+        )
+    if scenario_key == "low_oxygen":
+        if safe:
+            return (
+                f"Current oxygen saturation is {payload.get('spo2', 0)}% for {payload.get('duration_sec', 0)}s, "
+                "which is still within the safe range."
+            )
+        return (
+            f"Sustained low oxygen detected (SpO2 {payload.get('spo2', 0)}% for {payload.get('duration_sec', 0)}s). "
+            "Please confirm breathing status as soon as possible."
+        )
+    if scenario_key == "fall_detected":
+        if safe:
+            return "No reportable fall event is currently detected."
+        return (
+            f"Possible fall detected ({payload.get('impact_g', 0.0):.1f}g impact, {payload.get('no_movement_sec', 0)}s without movement). "
+            "Please verify whether the older adult is injured immediately."
+        )
+    if scenario_key == "irregular_rhythm":
+        if safe:
+            return "No sustained abnormal rhythm has been detected so far."
+        return (
+            f"Possible irregular rhythm detected for {payload.get('duration_sec', 0)}s with {payload.get('episode_count', 0)} flagged segments. "
+            "Please check on the older adult soon."
+        )
+    if scenario_key == "high_temperature":
+        if safe:
+            return (
+                f"Current temperature is about {payload.get('body_temperature', 0.0):.1f}C for {payload.get('duration_sec', 0)}s, "
+                "which has not reached the alert rule."
+            )
+        return (
+            f"Abnormally high temperature detected ({payload.get('body_temperature', 0.0):.1f}C for {payload.get('duration_sec', 0)}s). "
+            "Please confirm the older adult's condition promptly."
+        )
+    if scenario_key == "prolonged_inactivity":
+        if safe:
+            return (
+                f"Current inactivity duration is {payload.get('inactivity_minutes', 0)} minutes, "
+                "which is still below the alert threshold."
+            )
+        return (
+            f"Prolonged inactivity detected ({payload.get('inactivity_minutes', 0)} minutes without meaningful movement). "
+            "Please check whether the older adult is safe."
+        )
+    return ""
+
+
 def get_demo_signal_scenarios():
     return copy.deepcopy(DEMO_SIGNAL_SCENARIOS)
 
 
-def build_demo_signal_payload(scenario_key, sender_id="elder_01", safe=False):
+def build_demo_signal_payload(scenario_key, sender_id="elder_01", safe=False, locale="zh"):
     scenarios = get_demo_signal_scenarios()
     if scenario_key not in scenarios:
         raise KeyError(f"unknown demo scenario: {scenario_key}")
     payload_key = "safe_payload" if safe else "alert_payload"
-    payload = scenarios[scenario_key][payload_key]
+    payload = copy.deepcopy(scenarios[scenario_key][payload_key])
+    payload["locale"] = _normalize_demo_locale(locale)
+    location = payload.get("location")
+    if isinstance(location, dict):
+        payload["location"] = _localized_demo_location(location, locale)
+    message = _build_demo_signal_message(scenario_key, payload, safe, locale)
+    if message:
+        payload["message"] = message
     payload["sender_id"] = sender_id
     return payload
 
@@ -281,11 +408,12 @@ def _base_context(payload):
     sender_id = str(payload.get("sender_id", "") or "")
     severity = str(payload.get("severity", "") or "")
     timestamp = str(payload.get("timestamp", "") or time.strftime("%Y-%m-%d %H:%M:%S"))
-    return signal_type, sender_id, severity, timestamp
+    locale = _normalize_demo_locale(payload.get("locale", "zh"))
+    return signal_type, sender_id, severity, timestamp, locale
 
 
 def _evaluate_heart_rate(payload):
-    signal_type, sender_id, severity, timestamp = _base_context(payload)
+    signal_type, sender_id, severity, timestamp, locale = _base_context(payload)
     heart_rate = _coerce_int(payload.get("heart_rate", payload.get("value", 0)), 0)
     duration_sec = _coerce_int(payload.get("duration_sec", 0), 0)
     threshold = _coerce_int(payload.get("threshold", 130), 130)
@@ -305,6 +433,7 @@ def _evaluate_heart_rate(payload):
         "signal_type": signal_type,
         "sender_id": sender_id,
         "timestamp": timestamp,
+        "locale": locale,
         "heart_rate": heart_rate,
         "duration_sec": duration_sec,
         "threshold": threshold,
@@ -328,7 +457,7 @@ def _evaluate_heart_rate(payload):
 
 
 def _evaluate_blood_oxygen(payload):
-    signal_type, sender_id, severity, timestamp = _base_context(payload)
+    signal_type, sender_id, severity, timestamp, locale = _base_context(payload)
     spo2 = _coerce_int(payload.get("spo2", payload.get("value", 0)), 0)
     duration_sec = _coerce_int(payload.get("duration_sec", 0), 0)
     low_threshold = _coerce_int(payload.get("low_threshold", 90), 90)
@@ -347,6 +476,7 @@ def _evaluate_blood_oxygen(payload):
         "signal_type": signal_type,
         "sender_id": sender_id,
         "timestamp": timestamp,
+        "locale": locale,
         "spo2": spo2,
         "duration_sec": duration_sec,
         "low_threshold": low_threshold,
@@ -369,7 +499,7 @@ def _evaluate_blood_oxygen(payload):
 
 
 def _evaluate_fall_detected(payload):
-    signal_type, sender_id, severity, timestamp = _base_context(payload)
+    signal_type, sender_id, severity, timestamp, locale = _base_context(payload)
     fall_detected = _coerce_bool(payload.get("fall_detected", payload.get("value", False)), False)
     impact_g = _coerce_float(payload.get("impact_g", 0.0), 0.0)
     no_movement_sec = _coerce_int(payload.get("no_movement_sec", 0), 0)
@@ -387,6 +517,7 @@ def _evaluate_fall_detected(payload):
         "signal_type": signal_type,
         "sender_id": sender_id,
         "timestamp": timestamp,
+        "locale": locale,
         "fall_detected": fall_detected,
         "impact_g": impact_g,
         "no_movement_sec": no_movement_sec,
@@ -407,7 +538,7 @@ def _evaluate_fall_detected(payload):
 
 
 def _evaluate_irregular_rhythm(payload):
-    signal_type, sender_id, severity, timestamp = _base_context(payload)
+    signal_type, sender_id, severity, timestamp, locale = _base_context(payload)
     detected = _coerce_bool(payload.get("irregular_rhythm_detected", payload.get("value", False)), False)
     duration_sec = _coerce_int(payload.get("duration_sec", 0), 0)
     min_duration_sec = _coerce_int(payload.get("min_duration_sec", 45), 45)
@@ -426,6 +557,7 @@ def _evaluate_irregular_rhythm(payload):
         "signal_type": signal_type,
         "sender_id": sender_id,
         "timestamp": timestamp,
+        "locale": locale,
         "irregular_rhythm_detected": detected,
         "duration_sec": duration_sec,
         "min_duration_sec": min_duration_sec,
@@ -450,7 +582,7 @@ def _evaluate_irregular_rhythm(payload):
 
 
 def _evaluate_body_temperature(payload):
-    signal_type, sender_id, severity, timestamp = _base_context(payload)
+    signal_type, sender_id, severity, timestamp, locale = _base_context(payload)
     body_temperature = _coerce_float(
         payload.get("body_temperature", payload.get("temperature", payload.get("value", 0.0))),
         0.0,
@@ -492,6 +624,7 @@ def _evaluate_body_temperature(payload):
         "signal_type": signal_type,
         "sender_id": sender_id,
         "timestamp": timestamp,
+        "locale": locale,
         "body_temperature": body_temperature,
         "duration_sec": duration_sec,
         "high_threshold": high_threshold,
@@ -517,7 +650,7 @@ def _evaluate_body_temperature(payload):
 
 
 def _evaluate_inactivity(payload):
-    signal_type, sender_id, severity, timestamp = _base_context(payload)
+    signal_type, sender_id, severity, timestamp, locale = _base_context(payload)
     inactivity_minutes = _coerce_int(payload.get("inactivity_minutes", payload.get("minutes", 0)), 0)
     threshold_minutes = _coerce_int(payload.get("threshold_minutes", 120), 120)
     during_sleep = _coerce_bool(payload.get("during_sleep", False), False)
@@ -537,6 +670,7 @@ def _evaluate_inactivity(payload):
         "signal_type": signal_type,
         "sender_id": sender_id,
         "timestamp": timestamp,
+        "locale": locale,
         "inactivity_minutes": inactivity_minutes,
         "threshold_minutes": threshold_minutes,
         "during_sleep": during_sleep,
@@ -720,6 +854,7 @@ def build_alert_requests(
     severity="warning",
     details=None,
     timestamp="",
+    locale="",
     target_ids=None,
     binding_file=DEFAULT_BINDINGS_PATH,
 ):
@@ -744,6 +879,8 @@ def build_alert_requests(
             "severity": severity or "warning",
             "timestamp": timestamp or time.strftime("%Y-%m-%d %H:%M:%S"),
         }
+        if locale:
+            payload["locale"] = locale
         if details:
             payload["details"] = details
         if node.get("recipient_open_id"):
@@ -766,6 +903,7 @@ def send_bound_alert(
     severity="warning",
     details=None,
     timestamp="",
+    locale="",
     target_ids=None,
     binding_file=DEFAULT_BINDINGS_PATH,
     timeout=10,
@@ -777,6 +915,7 @@ def send_bound_alert(
         severity=severity,
         details=details or {},
         timestamp=timestamp,
+        locale=locale,
         target_ids=target_ids,
         binding_file=binding_file,
     )
@@ -1014,6 +1153,7 @@ class CrossDeviceServer:
                             severity=decision["severity"],
                             details=decision.get("details", {}),
                             timestamp=decision.get("timestamp", ""),
+                            locale=decision.get("locale", ""),
                             binding_file=outer.binding_file,
                             timeout=10,
                         )
