@@ -162,7 +162,7 @@
     "name": "phone_control",
     "description": "控制通过ADB连接的Android手机。支持截图、点击、滑动、输入文字、获取UI元素、启动App等操作。可用于操控手机App（如点外卖、查看健康数据等）。每次操作后建议用ui_dump或screenshot确认结果。cost=0.02。使用前需先check_connection确认手机已连接。",
     "parameters": {"type": "object", "properties": {
-      "action": {"type": "string", "enum": ["check_connection", "screenshot", "tap", "swipe", "input_text", "press_key", "launch_app", "ui_dump", "scroll_down", "scroll_up", "current_app", "list_apps"], "description": "要执行的操作类型"},
+      "action": {"type": "string", "enum": ["check_connection", "screenshot", "tap", "swipe", "input_text", "press_key", "launch_app", "ui_dump", "tap_keyword_confirm", "scroll_down", "scroll_up", "current_app", "list_apps"], "description": "要执行的操作类型"},
       "x": {"type": "number", "description": "点击/滑动起点的x坐标（像素）"},
       "y": {"type": "number", "description": "点击/滑动起点的y坐标（像素）"},
       "x2": {"type": "number", "description": "滑动终点的x坐标"},
@@ -171,7 +171,9 @@
       "key": {"type": "string", "description": "要按的键: back/home/recent/enter/delete"},
       "app": {"type": "string", "description": "要启动的App名称(如'美团外卖','微信')或包名"},
       "keyword": {"type": "string", "description": "ui_dump时过滤含该关键词的元素"},
-      "clickable_only": {"type": "boolean", "description": "ui_dump时是否只显示可点击元素", "default": false}
+      "clickable_only": {"type": "boolean", "description": "ui_dump时是否只显示可点击元素；tap_keyword_confirm也可用该参数优先可点击节点", "default": false},
+      "confirm_keyword": {"type": "string", "description": "tap_keyword_confirm 的可选确认关键词（点击后会检查该关键词是否出现）"},
+      "wait_ms": {"type": "number", "description": "tap_keyword_confirm 点击后等待毫秒数，默认1200"}
     }, "required": ["action"]}
   }},
   {"type": "function", "function": {

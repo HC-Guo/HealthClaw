@@ -1223,6 +1223,59 @@ class GenericAgentHandler(BaseHandler):
 
     def next_prompt_patcher(self, next_prompt, outcome, turn):
         self._current_turn = turn
+        # 每轮都追加输出语言提示；优先尊重用户显式要求（如 answer in Chinese）。
+        q = ""
+        for line in reversed(self.history_info or []):
+            if line.startswith("[USER]:"):
+                q = line[len("[USER]:") :].strip()
+                break
+        if q:
+            ql = q.lower()
+            lang = None
+            zh_override_markers = (
+                "answer in chinese",
+                "reply in chinese",
+                "respond in chinese",
+                "in chinese",
+                "请用中文",
+                "用中文回答",
+                "中文回答",
+                "中文输出",
+            )
+            en_override_markers = (
+                "answer in english",
+                "reply in english",
+                "respond in english",
+                "in english",
+                "请用英文",
+                "用英文回答",
+                "英文回答",
+                "英文输出",
+            )
+            if any(m in ql for m in zh_override_markers):
+                lang = "zh"
+            elif any(m in ql for m in en_override_markers):
+                lang = "en"
+            else:
+                cjk_count = len(re.findall(r"[\u4e00-\u9fff]", q))
+                en_word_count = len(re.findall(r"\b[a-zA-Z]{2,}\b", q))
+                if en_word_count >= 3 and en_word_count > cjk_count:
+                    lang = "en"
+                elif cjk_count >= 2 and cjk_count >= en_word_count:
+                    lang = "zh"
+
+            if lang == "en":
+                next_prompt += (
+                    "\n\n[System — Output Language]\n"
+                    "Respond in English for this turn.\n"
+                    "If your draft is not in English, rewrite it in English before final output."
+                )
+            elif lang == "zh":
+                next_prompt += (
+                    "\n\n[System — 输出语言]\n"
+                    "本轮请使用中文回答。\n"
+                    "若草稿不是中文，请在输出前改写为中文。"
+                )
 
         failure_hint = self.tracker.get_failure_summary()
         if failure_hint and turn % 3 == 0:

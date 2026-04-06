@@ -1645,7 +1645,7 @@ class UKBAgentHandler(GenericAgentHandler):
                 time.sleep(0.5)
                 return StepOutcome(
                     data={"status": "ok" if ok else "error", "msg": msg},
-                    next_prompt=self._get_anchor_prompt() + f"\n[点击操作] 已点击坐标 ({x}, {y})。\n建议用 ui_dump 或 phone_screen_analyze 确认操作结果。"
+                    next_prompt=self._get_anchor_prompt() + f"\n[点击操作] 已点击坐标 ({x}, {y})。\n请先用 ui_dump 确认结果；仅当 ui_dump 无法判断时再使用 phone_screen_analyze。"
                 )
 
             elif action == "swipe":
@@ -1695,7 +1695,7 @@ class UKBAgentHandler(GenericAgentHandler):
                 ok, msg = launch_app(app)
                 time.sleep(2)
                 if ok:
-                    next_prompt = self._get_anchor_prompt() + f"\n[启动App] {msg}\n等待2秒后，建议用 ui_dump 或 phone_screen_analyze 查看App界面。"
+                    next_prompt = self._get_anchor_prompt() + f"\n[启动App] {msg}\n等待2秒后，优先用 ui_dump 检查页面；仅在 ui_dump 信息不足时再用 phone_screen_analyze。"
                 else:
                     next_prompt = self._get_anchor_prompt() + f"\n[启动App 失败] {msg}\n请根据用户描述与上述本机已安装列表自行做关键词/语义匹配选包重试；若列表中无相关包则停止任务并向用户说明或建议其说出具体应用名称。"
                 return StepOutcome(
@@ -1715,12 +1715,114 @@ class UKBAgentHandler(GenericAgentHandler):
                     next_prompt=self._get_anchor_prompt() + f"\n[UI元素列表]\n{full_summary}\n\n根据UI元素决定下一步操作（点击、滑动等）。"
                 )
 
+            elif action == "tap_keyword_confirm":
+                keyword = str(args.get("keyword", "") or "").strip()
+                if not keyword:
+                    return StepOutcome(
+                        data={"status": "error", "msg": "tap_keyword_confirm 需要 keyword 参数"},
+                        next_prompt=self._get_anchor_prompt() + "\n[错误] tap_keyword_confirm 需要提供 keyword 参数。"
+                    )
+                confirm_keyword = str(args.get("confirm_keyword", "") or "").strip()
+                wait_ms = int(args.get("wait_ms", 1200) or 1200)
+                clickable_only = bool(args.get("clickable_only", False))
+
+                before_app = get_current_app()
+                before_nodes, _ = ui_dump(keyword, clickable_only)
+                fallback_used = False
+                # 常见场景：文本节点不可点击、父容器可点击。若仅查 clickable 节点失败，自动回退全量检索一次。
+                if not before_nodes and clickable_only:
+                    before_nodes, _ = ui_dump(keyword, False)
+                    fallback_used = bool(before_nodes)
+                if not before_nodes:
+                    return StepOutcome(
+                        data={
+                            "status": "error",
+                            "msg": f"未找到关键词元素: {keyword}",
+                            "keyword": keyword,
+                            "clickable_only": clickable_only,
+                            "fallback_used": fallback_used,
+                        },
+                        next_prompt=self._get_anchor_prompt() + (
+                            f"\n[点击失败] 未找到关键词「{keyword}」对应元素。"
+                            + ("\n已自动回退到 clickable_only=false 重试，仍未命中。" if clickable_only else "")
+                            + "\n建议先用 ui_dump(clickable_only=false) 查看全量结构；仅在仍无法定位时再用 phone_screen_analyze。"
+                        )
+                    )
+
+                # 优先可点击节点；若都不可点击，退化到首个匹配节点中心点点击
+                target = next((n for n in before_nodes if n.get("clickable")), before_nodes[0])
+                x, y = int(target.get("cx", 0) or 0), int(target.get("cy", 0) or 0)
+                if x <= 0 or y <= 0:
+                    return StepOutcome(
+                        data={"status": "error", "msg": "目标元素缺少可用坐标", "target": target},
+                        next_prompt=self._get_anchor_prompt() + f"\n[点击失败] 关键词「{keyword}」已命中，但元素缺少可用坐标。可改用 phone_screen_analyze 识别。"
+                    )
+
+                ok, msg = tap(x, y)
+                if not ok:
+                    return StepOutcome(
+                        data={"status": "error", "msg": msg, "keyword": keyword, "target": target},
+                        next_prompt=self._get_anchor_prompt() + f"\n[点击失败] 关键词「{keyword}」命中后点击失败: {msg}"
+                    )
+
+                time.sleep(max(wait_ms, 200) / 1000.0)
+                after_app = get_current_app()
+                check_keyword = confirm_keyword or keyword
+                after_nodes, _ = ui_dump(check_keyword, False)
+
+                app_changed = (
+                    before_app.get("package") != after_app.get("package")
+                    or before_app.get("activity") != after_app.get("activity")
+                )
+                confirm_hit = bool(after_nodes) if confirm_keyword else False
+                keyword_changed = len(after_nodes) != len(before_nodes)
+                confirmed = app_changed or confirm_hit or keyword_changed
+
+                confirm_reason = []
+                if app_changed:
+                    confirm_reason.append("app/activity changed")
+                if confirm_hit:
+                    confirm_reason.append(f"found confirm_keyword={check_keyword}")
+                if keyword_changed:
+                    confirm_reason.append("keyword nodes count changed")
+                if not confirm_reason:
+                    confirm_reason.append("state unchanged; need visual verify")
+
+                status = "ok" if confirmed else "warning"
+                needs_visual_verify = not confirmed
+                return StepOutcome(
+                    data={
+                        "status": status,
+                        "msg": f"tap_keyword_confirm({keyword})",
+                        "confirmed": confirmed,
+                        "needs_visual_verify": needs_visual_verify,
+                        "confirm_reason": ", ".join(confirm_reason),
+                        "tap_point": {"x": x, "y": y},
+                        "target": target,
+                        "before_app": before_app,
+                        "after_app": after_app,
+                        "before_match_count": len(before_nodes),
+                        "after_match_count": len(after_nodes),
+                        "fallback_used": fallback_used,
+                    },
+                    next_prompt=self._get_anchor_prompt() + (
+                        f"\n[关键词点击] 已尝试点击「{keyword}」@({x},{y})。"
+                        + ("\n说明: 初次 clickable_only=true 未命中，已自动回退全量检索并命中。" if fallback_used else "")
+                        + f"\n确认结果: {'成功' if confirmed else '不确定'}（{', '.join(confirm_reason)}）。"
+                        + (
+                            f"\n已命中确认关键词「{check_keyword}」。可继续下一步，通常无需视觉确认。"
+                            if confirmed
+                            else "\n建议先做一次 ui_dump(可不带关键词) 再确认；仅当仍不确定时使用 phone_screen_analyze。"
+                        )
+                    )
+                )
+
             elif action == "scroll_down":
                 ok, msg = scroll_down()
                 time.sleep(0.5)
                 return StepOutcome(
                     data={"status": "ok" if ok else "error", "msg": msg},
-                    next_prompt=self._get_anchor_prompt() + "\n[滚动] 已向下滚动一屏。建议用 ui_dump 查看新内容。"
+                    next_prompt=self._get_anchor_prompt() + "\n[滚动] 已向下滚动一屏。请优先用 ui_dump 查看新内容；仅在文本信息不足时再用 phone_screen_analyze。"
                 )
 
             elif action == "scroll_up":
@@ -1728,7 +1830,7 @@ class UKBAgentHandler(GenericAgentHandler):
                 time.sleep(0.5)
                 return StepOutcome(
                     data={"status": "ok" if ok else "error", "msg": msg},
-                    next_prompt=self._get_anchor_prompt() + "\n[滚动] 已向上滚动一屏。建议用 ui_dump 查看新内容。"
+                    next_prompt=self._get_anchor_prompt() + "\n[滚动] 已向上滚动一屏。请优先用 ui_dump 查看新内容；仅在文本信息不足时再用 phone_screen_analyze。"
                 )
 
             elif action == "current_app":
@@ -1754,7 +1856,7 @@ class UKBAgentHandler(GenericAgentHandler):
             else:
                 return StepOutcome(
                     data={"status": "error", "msg": f"未知操作: {action}"},
-                    next_prompt=self._get_anchor_prompt() + f"\n[错误] 未知操作: {action}。\n可用操作: check_connection, screenshot, tap, swipe, input_text, press_key, launch_app, ui_dump, scroll_down, scroll_up, current_app, list_apps"
+                    next_prompt=self._get_anchor_prompt() + f"\n[错误] 未知操作: {action}。\n可用操作: check_connection, screenshot, tap, swipe, input_text, press_key, launch_app, ui_dump, tap_keyword_confirm, scroll_down, scroll_up, current_app, list_apps"
                 )
         except Exception as e:
             return StepOutcome(
