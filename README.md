@@ -44,15 +44,15 @@ An open-source self-evolving agent stack for medical consultation support, perso
 
 <p align="center">
   <video
-    poster="./docs/readme_media/meal_plan_recommendation_demo_cover.png"
-    src="https://github.com/user-attachments/assets/8d0623d6-ffa8-4012-8f16-c8e8afc337d6"
+    poster="./docs/readme_media/meal_plan_recommendation_demo_cover_en.png"
+    src="https://github.com/user-attachments/assets/93613202-9657-45f1-a6b6-c0ced1b58f39"
     controls
     muted
     playsinline
     preload="metadata"
     width="800"
   >
-    If the player does not appear, <a href="https://github.com/user-attachments/assets/8d0623d6-ffa8-4012-8f16-c8e8afc337d6">open the video directly</a>.
+    If the player does not appear, <a href="https://github.com/user-attachments/assets/93613202-9657-45f1-a6b6-c0ced1b58f39">open the video directly</a>.
   </video>
 </p>
 

@@ -13,15 +13,15 @@ Typical HealthClaw usage scenarios in one place.
 
 <p align="center">
   <video
-    poster="../readme_media/showcase_cross_device_cover.png"
-    src="https://github.com/user-attachments/assets/d80728e2-1d88-4117-9256-fe2abd19a983"
+    poster="../readme_media/showcase_cross_device_cover_en.png"
+    src="https://github.com/user-attachments/assets/f3afe627-1044-47b9-84c5-28c154b137e3"
     controls
     muted
     playsinline
     preload="metadata"
     width="800"
   >
-    If the player does not appear, <a href="https://github.com/user-attachments/assets/d80728e2-1d88-4117-9256-fe2abd19a983">open the video directly</a>.
+    If the player does not appear, <a href="https://github.com/user-attachments/assets/f3afe627-1044-47b9-84c5-28c154b137e3">open the video directly</a>.
   </video>
 </p>
 
