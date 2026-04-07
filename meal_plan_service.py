@@ -204,14 +204,153 @@ def _phone_ready():
     return ok
 
 
+def _dismiss_address_panel_if_needed():
+    nodes, _summary = phone_control.ui_dump(clickable_only=False)
+    if not nodes:
+        return False
+
+    full_text = " ".join(
+        " ".join(
+            [
+                str(node.get("text", "") or "").strip(),
+                str(node.get("description", "") or "").strip(),
+                str(node.get("id", "") or "").strip(),
+            ]
+        )
+        for node in nodes
+    )
+    panel_markers = ["当前指定地址", "指定地址", "附近地址", "我的地址", "修改地址", "重置", "完成"]
+    if not any(marker in full_text for marker in panel_markers):
+        return False
+
+    complete_candidates = []
+    for node in nodes:
+        text = str(node.get("text", "") or "").strip()
+        desc = str(node.get("description", "") or "").strip()
+        if text == "完成" or desc == "完成":
+            complete_candidates.append(node)
+    if not complete_candidates:
+        return False
+
+    target = sorted(complete_candidates, key=lambda node: int(node.get("cy", 0) or 0), reverse=True)[0]
+    point = (int(target.get("cx", 0)), int(target.get("cy", 0)))
+    if point == (0, 0):
+        return False
+    _tap(point)
+    time.sleep(2.5)
+    return True
+
+
+def _stabilize_search_surface():
+    """Best-effort cleanup for overlays that can cover search/result content."""
+    _handle_known_overlays()
+    changed = False
+    for _ in range(2):
+        if _dismiss_address_panel_if_needed():
+            changed = True
+            time.sleep(1.5)
+            _handle_known_overlays()
+    return changed
+
+
+def _tap_homepage_search_entry():
+    nodes, _summary = phone_control.ui_dump(clickable_only=False)
+    preferred_ids = {
+        "com.sankuai.meituan:id/search_layout_area",
+        "com.sankuai.meituan:id/search_button",
+    }
+    candidates = []
+    for node in nodes:
+        node_id = str(node.get("id", "") or "").strip()
+        text = str(node.get("text", "") or "").strip()
+        desc = str(node.get("description", "") or "").strip()
+        if node_id in preferred_ids:
+            candidates.append(node)
+            continue
+        if "搜索" in text or "搜索" in desc:
+            candidates.append(node)
+    if not candidates:
+        return False
+
+    def _score(node):
+        node_id = str(node.get("id", "") or "").strip()
+        text = str(node.get("text", "") or "").strip()
+        desc = str(node.get("description", "") or "").strip()
+        score = 0
+        if node_id == "com.sankuai.meituan:id/search_layout_area":
+            score += 6
+        elif node_id == "com.sankuai.meituan:id/search_button":
+            score += 4
+        if "搜索" in text:
+            score += 2
+        if "搜索" in desc:
+            score += 2
+        return score
+
+    target = sorted(candidates, key=_score, reverse=True)[0]
+    point = (int(target.get("cx", 0)), int(target.get("cy", 0)))
+    if point == (0, 0):
+        return False
+    _tap(point)
+    time.sleep(2.5)
+    return True
+
+
+def _tap_search_submit_button():
+    nodes, _summary = phone_control.ui_dump(clickable_only=False)
+    candidates = []
+    for node in nodes:
+        text = str(node.get("text", "") or "").strip()
+        desc = str(node.get("description", "") or "").strip()
+        node_id = str(node.get("id", "") or "").strip()
+        cy = int(node.get("cy", 0) or 0)
+        if cy and cy > 420:
+            continue
+        if node_id == "com.sankuai.meituan:id/search_button":
+            candidates.append(node)
+            continue
+        if text == "搜索" or desc == "搜索":
+            candidates.append(node)
+    if not candidates:
+        return False
+
+    def _score(node):
+        score = 0
+        node_id = str(node.get("id", "") or "").strip()
+        text = str(node.get("text", "") or "").strip()
+        desc = str(node.get("description", "") or "").strip()
+        if node_id == "com.sankuai.meituan:id/search_button":
+            score += 8
+        if text == "搜索":
+            score += 4
+        if desc == "搜索":
+            score += 2
+        return score
+
+    target = sorted(candidates, key=_score, reverse=True)[0]
+    point = (int(target.get("cx", 0)), int(target.get("cy", 0)))
+    if point == (0, 0):
+        return False
+    _tap(point)
+    time.sleep(2.5)
+    return True
+
+
 def _open_search_page():
     _ensure_adb_env()
     phone_control.press_key("home")
     time.sleep(1)
     _run_adb("shell", "am", "start", "-W", "-n", MEITUAN_SEARCH_ACTIVITY, timeout=25)
     time.sleep(1.2)
-    _handle_known_overlays()
+    _stabilize_search_surface()
     activity = _wait_for_activity([".search.home.SearchActivity", ".search.result.SearchResultActivity"], timeout=20)
+    if ".search.home.SearchActivity" not in activity and ".search.result.SearchResultActivity" not in activity:
+        current = _current_activity()
+        if MEITUAN_MAIN_ACTIVITY in current and _tap_homepage_search_entry():
+            _stabilize_search_surface()
+            activity = _wait_for_activity([".search.home.SearchActivity", ".search.result.SearchResultActivity"], timeout=10)
+    if _stabilize_search_surface():
+        activity = _wait_for_activity([".search.home.SearchActivity", ".search.result.SearchResultActivity"], timeout=10)
     if UPGRADE_DIALOG_ACTIVITY in activity:
         _dismiss_upgrade_dialog_if_needed()
         activity = _wait_for_activity([".search.home.SearchActivity", ".search.result.SearchResultActivity"], timeout=10)
@@ -248,7 +387,13 @@ def _price_to_float(text):
 
 def _query_terms(query):
     known_terms = ["轻食", "沙拉", "鸡胸", "鸡胸肉", "豆浆", "三明治", "便当", "减脂", "低脂", "全麦"]
-    return [term for term in known_terms if term in query]
+    found = [term for term in known_terms if term in query]
+    if found:
+        return found
+    text = str(query or "").strip()
+    if " " in text:
+        return [part.strip() for part in text.split() if len(part.strip()) >= 2]
+    return [text] if len(text) >= 2 else []
 
 
 def _is_real_suggestion(text, query):
@@ -257,9 +402,35 @@ def _is_real_suggestion(text, query):
         return False
     if clean.endswith("按钮") or clean.startswith("复旦大学("):
         return False
-    if any(token in clean for token in ["好评榜", "热销榜", "门店销量", "新客", "配送", "下单", "评分", "接受预订", "明天", "清除历史记录"]):
+    if any(
+        token in clean
+        for token in [
+            "好评榜",
+            "热销榜",
+            "门店销量",
+            "新客",
+            "配送",
+            "下单",
+            "评分",
+            "接受预订",
+            "明天",
+            "清除历史记录",
+            "演唱会",
+            "抢票",
+            "上线",
+            "商圈",
+            "当前指定地址",
+            "附近地址",
+            "我的地址",
+            "修改地址",
+            "完成",
+            "重置",
+            "地址",
+        ]
+    ):
         return False
-    if query and not any(ch in clean for ch in query if ch.strip()):
+    query_terms = _query_terms(query)
+    if query_terms and not any(term in clean for term in query_terms):
         return False
     return len(clean) >= 2
 
@@ -306,9 +477,17 @@ def _score_suggestion(candidate, query):
 
 
 def _is_safe_item_to_add(item_name, store_name, query, item_price):
-    aggregate = f"{item_name} {store_name} {query}"
+    aggregate = f"{item_name} {store_name}"
     query_terms = _query_terms(query)
-    if query_terms and not any(term in aggregate for term in query_terms):
+    matched_terms = [term for term in query_terms if term and term in aggregate]
+    if query_terms and not matched_terms:
+        return False
+    if any(term in query for term in ["沙拉", "轻食"]):
+        if not any(token in aggregate for token in ["沙拉", "轻食", "健康餐"]):
+            return False
+        if any(token in aggregate for token in ["牛排", "牛扒", "面包", "蛋糕", "咖啡", "豆浆夜市", "超市"]):
+            return False
+    if "鸡胸" in query and "鸡胸" not in aggregate:
         return False
     price_value = _price_to_float(item_price)
     if price_value and price_value > 50:
@@ -322,7 +501,31 @@ def _is_result_store_box(box):
         return False
     if box["top"] < 500 or box["top"] > 1700:
         return False
-    if any(key in text for key in ["月售", "分钟", "km", "点评", "起送", "配送", "营业", "红包", "领券", "图片热量", "收藏", "价格", "￥", "¥", "休息"]):
+    if any(
+        key in text
+        for key in [
+            "月售",
+            "分钟",
+            "km",
+            "点评",
+            "起送",
+            "配送",
+            "营业",
+            "红包",
+            "领券",
+            "图片热量",
+            "收藏",
+            "价格",
+            "￥",
+            "¥",
+            "休息",
+            "人气榜",
+            "好评榜",
+            "热销榜",
+            "第",
+            "名>",
+        ]
+    ):
         return False
     if len(text) < 4 or text.startswith("复旦大学"):
         return False
@@ -379,21 +582,31 @@ def _extract_result_cards(ocr_boxes, limit=3):
 def _score_result_card(card, query):
     aggregate = f"{card.get('store_name', '')} {card.get('block_text', '')}"
     score = 0
-    for term in _query_terms(query):
+    query_terms = _query_terms(query)
+    for term in query_terms:
         if term in card.get("store_name", ""):
             score += 5
         if term in aggregate:
             score += 2
     if "轻食" in aggregate or "沙拉" in aggregate:
         score += 2
+    if "健康餐" in aggregate:
+        score += 2
+    if "鸡胸" in aggregate or "鸡肉" in aggregate:
+        score += 2
     if "便利店" in card.get("store_name", ""):
         score -= 2
+    if any(term in query for term in ["沙拉", "轻食"]):
+        if not any(token in aggregate for token in ["沙拉", "轻食", "健康餐"]):
+            score -= 6
+        if any(token in aggregate for token in ["牛排", "牛扒", "面包", "蛋糕", "咖啡", "豆浆夜市", "超市"]):
+            score -= 8
     return score
 
 
 def _extract_addable_items(ocr_boxes, limit=3):
     plus_boxes = [b for b in ocr_boxes if b["text"] == "+" and b["top"] > 1000]
-    spec_boxes = [b for b in ocr_boxes if "选规格" in b["text"] and b["top"] > 1800]
+    spec_boxes = [b for b in ocr_boxes if ("选规格" in b["text"] or "选套餐" in b["text"]) and b["top"] > 1800]
     items = []
     action_boxes = [("add", box) for box in plus_boxes] + [("select_spec", box) for box in spec_boxes]
     for action_type, plus in action_boxes:
@@ -441,6 +654,16 @@ def _extract_addable_items(ocr_boxes, limit=3):
     return items
 
 
+def _scroll_merchant_for_addable_items():
+    """Merchant pages often place the + button slightly below the first viewport."""
+    res, _, _ = _run_adb("shell", "wm", "size")
+    m = re.search(r"(\d+)x(\d+)", res)
+    if m:
+        w, h = int(m.group(1)), int(m.group(2))
+        return phone_control.swipe(w // 2, int(h * 0.78), w // 2, int(h * 0.58), 350)
+    return phone_control.swipe(540, 1820, 540, 1350, 350)
+
+
 def _extract_cart_summary(ocr_boxes):
     total_price = ""
     cart_cta = ""
@@ -474,6 +697,10 @@ def _best_effort_submit_search():
         phone_control.press_key("enter")
         time.sleep(2.5)
         activity = _current_activity()
+    if ".search.result.SearchResultActivity" not in activity and _tap_search_submit_button():
+        activity = _current_activity()
+    if _stabilize_search_surface():
+        activity = _current_activity()
     return activity
 
 
@@ -502,6 +729,9 @@ def search_food_suggestions(query, limit=5):
         "searched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
     result_activity = _best_effort_submit_search()
+    time.sleep(1.5)
+    _stabilize_search_surface()
+    result_activity = _current_activity()
     screenshot_path = _capture_screenshot("meituan_search_result")
     return {**base, "result_activity": result_activity, "screenshot_path": screenshot_path}
 
@@ -523,6 +753,9 @@ def search_and_add_best_item(query, limit=5):
     result_activity = _current_activity()
     if ".search.result.SearchResultActivity" not in result_activity:
         result_activity = _best_effort_submit_search()
+    time.sleep(1.5)
+    _stabilize_search_surface()
+    result_activity = _current_activity()
     result_screenshot = _capture_screenshot("meituan_search_result")
     result_boxes = _ocr_boxes(result_screenshot) if result_screenshot and os.path.exists(result_screenshot) else []
     result_cards = _extract_result_cards(result_boxes, limit=limit)
@@ -536,15 +769,26 @@ def search_and_add_best_item(query, limit=5):
         merchant_screenshot = _capture_screenshot("meituan_merchant_page")
         merchant_boxes = _ocr_boxes(merchant_screenshot)
         addable_items = _extract_addable_items(merchant_boxes, limit=3)
+        if not addable_items:
+            _scroll_merchant_for_addable_items()
+            time.sleep(2.0)
+            merchant_screenshot = _capture_screenshot("meituan_merchant_page")
+            merchant_boxes = _ocr_boxes(merchant_screenshot)
+            addable_items = _extract_addable_items(merchant_boxes, limit=3)
         if addable_items:
             selected = addable_items[0]
             if selected.get("action_type") == "select_spec":
+                _tap(selected["add_button"])
+                time.sleep(2.5)
+                spec_screenshot = _capture_screenshot("meituan_spec_selection")
                 cart_action = {
                     "status": "needs_spec_selection",
                     "store_name": first_card["store_name"],
                     "item_name": selected["item_name"],
                     "item_price": selected["price"],
                     "merchant_screenshot": merchant_screenshot,
+                    "cart_screenshot": spec_screenshot,
+                    "spec_panel_opened": True,
                 }
             elif _is_safe_item_to_add(selected["item_name"], first_card["store_name"], query, selected["price"]):
                 _tap(selected["add_button"])
@@ -589,56 +833,106 @@ def search_and_add_best_item(query, limit=5):
 
 
 DEFAULT_MEAL_SCHEDULE = {
-    "breakfast": {"meal_time": "08:00", "push_lead_minutes": 60, "label": "早餐"},
-    "lunch": {"meal_time": "12:00", "push_lead_minutes": 60, "label": "午餐"},
-    "dinner": {"meal_time": "18:00", "push_lead_minutes": 60, "label": "晚餐"},
+    "breakfast": {"meal_time": "08:00", "push_lead_minutes": 60, "label": "早餐", "label_en": "Breakfast"},
+    "lunch": {"meal_time": "12:00", "push_lead_minutes": 60, "label": "午餐", "label_en": "Lunch"},
+    "dinner": {"meal_time": "18:00", "push_lead_minutes": 60, "label": "晚餐", "label_en": "Dinner"},
 }
 
 
 GOAL_CONFIGS = {
     "weight_loss": {
         "label": "减脂",
+        "label_en": "Weight loss",
         "daily_calories": 1450,
         "meal_targets": {"breakfast": (300, 380), "lunch": (450, 580), "dinner": (400, 520)},
         "focus_tags": ["high_protein", "vegetable_rich", "light", "low_sugar"],
         "avoid_tags": ["fried", "sugary", "heavy_sauce"],
         "summary": "控制总热量、优先高蛋白和高蔬菜比例，帮助稳定减脂。",
+        "summary_en": "Control total calories with higher protein and more vegetables to support steady fat loss.",
     },
     "glucose_control": {
         "label": "控糖",
+        "label_en": "Glucose control",
         "daily_calories": 1550,
         "meal_targets": {"breakfast": (320, 400), "lunch": (480, 600), "dinner": (420, 520)},
         "focus_tags": ["low_sugar", "whole_grain", "high_fiber", "high_protein"],
         "avoid_tags": ["sugary", "refined_carb", "sweet_drink"],
         "summary": "优先低糖、粗粮和纤维，减少餐后血糖波动。",
+        "summary_en": "Prioritize lower sugar, whole grains, and fiber to reduce post-meal glucose swings.",
     },
     "heart_healthy": {
         "label": "心血管友好",
+        "label_en": "Heart-healthy",
         "daily_calories": 1550,
         "meal_targets": {"breakfast": (320, 400), "lunch": (470, 600), "dinner": (420, 520)},
         "focus_tags": ["low_sodium", "high_protein", "vegetable_rich", "soup"],
         "avoid_tags": ["fried", "high_sodium", "processed_meat"],
         "summary": "关注低盐、低油和稳定能量摄入，适合血压或心血管风险管理。",
+        "summary_en": "Emphasize lower sodium, lighter cooking, and steady energy intake for blood pressure or cardiovascular risk management.",
     },
     "balanced": {
         "label": "均衡饮食",
+        "label_en": "Balanced nutrition",
         "daily_calories": 1650,
         "meal_targets": {"breakfast": (320, 420), "lunch": (500, 650), "dinner": (450, 580)},
         "focus_tags": ["balanced", "high_protein", "vegetable_rich"],
         "avoid_tags": ["fried", "heavy_sauce"],
         "summary": "以均衡、可长期坚持为主，兼顾蛋白质、蔬菜和主食结构。",
+        "summary_en": "Focus on a balanced pattern that is sustainable long term, with protein, vegetables, and structured carbs.",
     },
 }
 
 
 DAY_THEME_ROTATION = [
-    {"name": "高蛋白轻负担日", "extra_tags": ["high_protein", "light"], "note": "优先鸡胸肉、鱼虾、豆制品和蔬菜。"},
-    {"name": "低糖稳能量日", "extra_tags": ["low_sugar", "whole_grain"], "note": "主食以全麦和粗粮为主，减少精制碳水。"},
-    {"name": "高纤维蔬菜日", "extra_tags": ["high_fiber", "vegetable_rich"], "note": "增加深色蔬菜和豆类摄入。"},
-    {"name": "低盐清爽日", "extra_tags": ["low_sodium", "soup"], "note": "适合控制钠摄入，避免重口味。"},
-    {"name": "鱼类优先日", "extra_tags": ["seafood", "light"], "note": "用鱼虾类替代部分红肉，减轻油腻负担。"},
-    {"name": "温和恢复日", "extra_tags": ["comfort", "soup"], "note": "适合忙碌后恢复，选择更好消化的组合。"},
-    {"name": "规律收口日", "extra_tags": ["balanced", "vegetable_rich"], "note": "三餐保持规律，避免临睡前过量进食。"},
+    {
+        "name": "高蛋白轻负担日",
+        "name_en": "High-protein light day",
+        "extra_tags": ["high_protein", "light"],
+        "note": "优先鸡胸肉、鱼虾、豆制品和蔬菜。",
+        "note_en": "Prioritize chicken breast, fish, shrimp, tofu, and vegetables.",
+    },
+    {
+        "name": "低糖稳能量日",
+        "name_en": "Low-sugar steady-energy day",
+        "extra_tags": ["low_sugar", "whole_grain"],
+        "note": "主食以全麦和粗粮为主，减少精制碳水。",
+        "note_en": "Use whole grains and coarse grains as the main carbs and reduce refined starches.",
+    },
+    {
+        "name": "高纤维蔬菜日",
+        "name_en": "High-fiber vegetable day",
+        "extra_tags": ["high_fiber", "vegetable_rich"],
+        "note": "增加深色蔬菜和豆类摄入。",
+        "note_en": "Increase dark leafy vegetables and legumes.",
+    },
+    {
+        "name": "低盐清爽日",
+        "name_en": "Low-sodium light day",
+        "extra_tags": ["low_sodium", "soup"],
+        "note": "适合控制钠摄入，避免重口味。",
+        "note_en": "Keep sodium lower and avoid heavy seasoning.",
+    },
+    {
+        "name": "鱼类优先日",
+        "name_en": "Fish-first day",
+        "extra_tags": ["seafood", "light"],
+        "note": "用鱼虾类替代部分红肉，减轻油腻负担。",
+        "note_en": "Swap some red meat for fish or shrimp to keep meals lighter.",
+    },
+    {
+        "name": "温和恢复日",
+        "name_en": "Gentle recovery day",
+        "extra_tags": ["comfort", "soup"],
+        "note": "适合忙碌后恢复，选择更好消化的组合。",
+        "note_en": "Use easier-to-digest combinations after a busy stretch.",
+    },
+    {
+        "name": "规律收口日",
+        "name_en": "Structured rhythm day",
+        "extra_tags": ["balanced", "vegetable_rich"],
+        "note": "三餐保持规律，避免临睡前过量进食。",
+        "note_en": "Keep meals regular and avoid overeating late at night.",
+    },
 ]
 
 
@@ -862,6 +1156,86 @@ def _recommendation_source_label(source):
     return source or "unknown"
 
 
+def _normalize_locale(locale):
+    return "en" if str(locale or "").strip().lower().startswith("en") else "zh"
+
+
+def _translate_constraint_note(note, locale):
+    if _normalize_locale(locale) != "en":
+        return note
+    mapping = {
+        "已避开用户已知过敏原。": "Known allergens are already excluded.",
+        "结合血糖/糖代谢风险，额外强调低糖和粗粮结构。": "Added stronger low-sugar and whole-grain guidance for glucose or metabolic risk.",
+        "结合血压风险，额外强调低盐和少加工。": "Added stronger low-sodium and low-processed-food guidance for blood pressure risk.",
+        "当前按通用健康约束生成，后续可继续根据你的偏好微调。": "Built with general health constraints for now, and it can be refined later around your preferences.",
+    }
+    return mapping.get(note, note)
+
+
+def _recommendation_source_note_for_locale(source, locale):
+    if _normalize_locale(locale) != "en":
+        return _recommendation_source_note(source)
+    if source == "meituan_phone_live_search":
+        return "The demo currently prioritizes the real phone-based Meituan search chain, and falls back to local candidate data only when the phone chain is unavailable."
+    if source == "meituan_demo_catalog":
+        return "The demo is currently using the local candidate catalog by default and can switch to real Meituan search once the phone chain is connected."
+    if source == "meituan_phone_suggestion":
+        return "Recommendations currently come from real phone-based Meituan search suggestions."
+    return f"Current recommendation source: {source}"
+
+
+def _recommendation_source_label_for_locale(source, locale):
+    if _normalize_locale(locale) != "en":
+        return _recommendation_source_label(source)
+    if source == "meituan_phone_live_search":
+        return "Real phone Meituan search first"
+    if source == "meituan_demo_catalog":
+        return "Local demo candidate catalog"
+    if source == "meituan_phone_suggestion":
+        return "Real phone Meituan suggestions"
+    return source or "unknown"
+
+
+def _meal_label_for_locale(meal_key, payload, locale):
+    if _normalize_locale(locale) == "en":
+        return str(
+            (payload or {}).get("label_en")
+            or (payload or {}).get("meal_label_en")
+            or DEFAULT_MEAL_SCHEDULE.get(meal_key, {}).get("label_en")
+            or meal_key.title()
+        )
+    return str(
+        (payload or {}).get("label")
+        or (payload or {}).get("meal_label")
+        or DEFAULT_MEAL_SCHEDULE.get(meal_key, {}).get("label")
+        or meal_key
+    )
+
+
+def _theme_name_for_locale(day_plan, locale):
+    if _normalize_locale(locale) == "en":
+        return str((day_plan or {}).get("theme_en") or (day_plan or {}).get("theme") or "")
+    return str((day_plan or {}).get("theme") or "")
+
+
+def _goal_note_for_locale(meal_spec, locale):
+    if _normalize_locale(locale) == "en":
+        return str((meal_spec or {}).get("goal_note_en") or (meal_spec or {}).get("goal_note") or "")
+    return str((meal_spec or {}).get("goal_note") or "")
+
+
+def _query_for_locale(meal_spec, locale):
+    if _normalize_locale(locale) == "en":
+        return str((meal_spec or {}).get("query_en_display") or (meal_spec or {}).get("phone_query") or (meal_spec or {}).get("query") or "")
+    return str((meal_spec or {}).get("query") or "")
+
+
+def _candidate_reason_for_locale(candidate, locale, default_zh, default_en):
+    if _normalize_locale(locale) == "en":
+        return str((candidate or {}).get("reason_en") or default_en)
+    return str((candidate or {}).get("reason") or default_zh)
+
+
 def _safe_float(value, default=0.0):
     try:
         return float(value)
@@ -882,6 +1256,16 @@ def _parse_clock(text, default_clock):
     text = text.strip()
     if not text:
         return default_clock
+    am_pm_match = re.match(r"(?i)(\d{1,2})(?::(\d{1,2}))?\s*(am|pm)", text)
+    if am_pm_match:
+        hour = int(am_pm_match.group(1))
+        minute = int(am_pm_match.group(2) or 0)
+        meridiem = am_pm_match.group(3).lower()
+        if meridiem == "pm" and hour < 12:
+            hour += 12
+        if meridiem == "am" and hour == 12:
+            hour = 0
+        return f"{hour:02d}:{minute:02d}"
     if ":" in text:
         parts = text.split(":")
         try:
@@ -927,11 +1311,11 @@ class MealPlanService:
     def parse_request(self, text):
         lowered = str(text or "").lower()
         goal = "balanced"
-        if any(word in lowered for word in ["减肥", "瘦身", "减脂", "控制体重"]):
+        if any(word in lowered for word in ["减肥", "瘦身", "减脂", "控制体重", "lose weight", "weight loss", "fat loss", "slim down"]):
             goal = "weight_loss"
-        elif any(word in lowered for word in ["控糖", "血糖", "糖尿病", "少糖"]):
+        elif any(word in lowered for word in ["控糖", "血糖", "糖尿病", "少糖", "glucose", "blood sugar", "diabetes", "low sugar"]):
             goal = "glucose_control"
-        elif any(word in lowered for word in ["血压", "低盐", "心脏", "心血管"]):
+        elif any(word in lowered for word in ["血压", "低盐", "心脏", "心血管", "blood pressure", "heart", "cardio", "low sodium"]):
             goal = "heart_healthy"
 
         meal_schedule = copy.deepcopy(DEFAULT_MEAL_SCHEDULE)
@@ -943,6 +1327,15 @@ class MealPlanService:
         )
         meal_schedule["dinner"]["meal_time"] = _extract_meal_time(
             text, ["晚餐", "晚饭", "晚上的饭", "晚上"], meal_schedule["dinner"]["meal_time"]
+        )
+        meal_schedule["breakfast"]["meal_time"] = _extract_meal_time(
+            text, ["breakfast", "morning"], meal_schedule["breakfast"]["meal_time"]
+        )
+        meal_schedule["lunch"]["meal_time"] = _extract_meal_time(
+            text, ["lunch", "noon"], meal_schedule["lunch"]["meal_time"]
+        )
+        meal_schedule["dinner"]["meal_time"] = _extract_meal_time(
+            text, ["dinner", "supper", "evening"], meal_schedule["dinner"]["meal_time"]
         )
         for meal_key, schedule in meal_schedule.items():
             schedule["push_time"] = _compute_push_time(schedule["meal_time"], schedule["push_lead_minutes"])
@@ -1006,6 +1399,7 @@ class MealPlanService:
         theme = DAY_THEME_ROTATION[day_index % len(DAY_THEME_ROTATION)]
         meals = {}
         for meal_key, label in [("breakfast", "早餐"), ("lunch", "午餐"), ("dinner", "晚餐")]:
+            meal_label_en = DEFAULT_MEAL_SCHEDULE[meal_key]["label_en"]
             calorie_min, calorie_max = goal_config["meal_targets"][meal_key]
             preferred_tags = list(goal_config["focus_tags"]) + list(theme["extra_tags"])
             if meal_key == "breakfast":
@@ -1027,25 +1421,34 @@ class MealPlanService:
             if "whole_grain" in preferred_tags:
                 query += " 粗粮"
             phone_query = self._build_phone_search_query(goal_config["label"], meal_key, preferred_tags)
+            query_en_display = f"Meituan {goal_config['label_en']} {meal_label_en} / high protein / light"
+            if "low_sugar" in preferred_tags:
+                query_en_display += " / low sugar"
+            if "whole_grain" in preferred_tags:
+                query_en_display += " / whole grain"
             meals[meal_key] = {
                 "meal_label": label,
+                "meal_label_en": meal_label_en,
                 "target_calories": [calorie_min, calorie_max],
                 "preferred_tags": sorted(set(preferred_tags)),
                 "avoid_tags": sorted(set(avoid_tags)),
                 "query": query.strip(),
+                "query_en_display": query_en_display,
                 "phone_query": phone_query,
                 "goal_note": theme["note"],
+                "goal_note_en": theme["note_en"],
             }
         return {
             "date": plan_date.strftime("%Y-%m-%d"),
             "theme": theme["name"],
+            "theme_en": theme["name_en"],
             "meals": meals,
         }
 
     def _build_phone_search_query(self, goal_label, meal_key, preferred_tags):
         if meal_key == "breakfast":
             if "low_sugar" in preferred_tags:
-                return "无糖豆浆 全麦三明治 早餐"
+                return "无糖豆浆全麦三明治"
             return "高蛋白轻食早餐"
         if meal_key == "lunch":
             if "whole_grain" in preferred_tags:
@@ -1054,10 +1457,10 @@ class MealPlanService:
                 return "清淡鸡胸肉便当 午餐"
             return "鸡胸肉蔬菜沙拉 午餐"
         if "seafood" in preferred_tags:
-            return "三文鱼沙拉 晚餐"
+            return "三文鱼沙拉"
         if "comfort" in preferred_tags:
-            return "低脂鸡肉沙拉 晚餐"
-        return "轻食减脂餐晚餐"
+            return "鸡胸肉蔬菜沙拉"
+        return "轻食鸡肉沙拉"
 
     def create_plan(self, open_id, text):
         parsed = self.parse_request(text)
@@ -1079,7 +1482,9 @@ class MealPlanService:
             "request_text": parsed["request_text"],
             "goal": goal_key,
             "goal_label": goal_config["label"],
+            "goal_label_en": goal_config["label_en"],
             "summary": goal_config["summary"],
+            "summary_en": goal_config["summary_en"],
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "start_date": start_date.strftime("%Y-%m-%d"),
@@ -1181,6 +1586,19 @@ class MealPlanService:
             reasons.append("整体更接近今天这顿“高蛋白、清淡、少油少负担”的方向")
         return "；".join(reasons)
 
+    def _build_candidate_reason_en(self, meal_spec, item_name, store_name):
+        reasons = []
+        text = f"{item_name} {store_name}"
+        if any(token in text for token in ["鸡胸", "牛肉", "鱼", "虾", "豆浆", "鸡蛋", "三文鱼", "豆腐"]):
+            reasons.append("Leans higher in protein, which matches this meal's weight-management goal")
+        if any(token in text for token in ["沙拉", "蔬菜", "轻食", "健康餐"]):
+            reasons.append("Usually comes with a higher vegetable ratio and feels lighter overall")
+        if any(token in text for token in ["全麦", "糙米", "杂粮"]):
+            reasons.append("Has a steadier carb structure that supports calorie control and satiety")
+        if not reasons:
+            reasons.append("Overall it stays closer to today's high-protein, lighter, lower-burden direction")
+        return "; ".join(reasons)
+
     def _build_display_candidates(self, meal_spec, candidates, result_cards, cart_action):
         display = []
         used_items = set()
@@ -1193,6 +1611,7 @@ class MealPlanService:
                     "store_name": cart_action.get("store_name", ""),
                     "price": cart_action.get("item_price", "") or "待店内确认",
                     "reason": self._build_candidate_reason(meal_spec, item_name, cart_action.get("store_name", "")),
+                    "reason_en": self._build_candidate_reason_en(meal_spec, item_name, cart_action.get("store_name", "")),
                 }
             )
             used_items.add(item_name)
@@ -1208,6 +1627,7 @@ class MealPlanService:
                     "store_name": store_name,
                     "price": "待店内确认",
                     "reason": self._build_candidate_reason(meal_spec, item_name, store_name),
+                    "reason_en": self._build_candidate_reason_en(meal_spec, item_name, store_name),
                 }
             )
             used_items.add(item_name)
@@ -1225,6 +1645,7 @@ class MealPlanService:
                     "store_name": store_name,
                     "price": candidate.get("price", "") or "待店内确认",
                     "reason": self._build_candidate_reason(meal_spec, item_name, store_name),
+                    "reason_en": self._build_candidate_reason_en(meal_spec, item_name, store_name),
                 }
             )
             used_items.add(item_name)
@@ -1253,19 +1674,26 @@ class MealPlanService:
         results = []
         for score, candidate in ranked[:limit]:
             reason_bits = []
+            reason_bits_en = []
             if "high_protein" in candidate.get("tags", []):
                 reason_bits.append("蛋白质更高")
+                reason_bits_en.append("higher protein")
             if "low_sugar" in candidate.get("tags", []):
                 reason_bits.append("更适合控糖")
+                reason_bits_en.append("better for glucose control")
             if "vegetable_rich" in candidate.get("tags", []):
                 reason_bits.append("蔬菜比例较高")
+                reason_bits_en.append("more vegetables")
             if "low_sodium" in candidate.get("tags", []):
                 reason_bits.append("更偏低盐")
+                reason_bits_en.append("lower sodium")
             if "whole_grain" in candidate.get("tags", []):
                 reason_bits.append("含粗粮/全麦")
+                reason_bits_en.append("includes whole grains")
             enriched = copy.deepcopy(candidate)
             enriched["match_score"] = score
             enriched["match_reason"] = "、".join(reason_bits) or "整体较符合当前这顿的目标"
+            enriched["match_reason_en"] = ", ".join(reason_bits_en) or "Overall a better fit for this meal's current goal"
             results.append(enriched)
         return results
 
@@ -1297,6 +1725,7 @@ class MealPlanService:
                         "store_name": item.get("store_name", ""),
                         "price": item.get("price", "") or "待店内确认",
                         "reason": item.get("match_reason", "整体较符合当前这顿目标"),
+                        "reason_en": item.get("match_reason_en", "Overall a better fit for this meal's current goal"),
                     }
                     for item in fallback_candidates[:limit]
                 ],
@@ -1362,6 +1791,7 @@ class MealPlanService:
                     "store_name": item.get("store_name", ""),
                     "price": item.get("price", "") or "待店内确认",
                     "reason": item.get("match_reason", "整体较符合当前这顿目标"),
+                    "reason_en": item.get("match_reason_en", "Overall a better fit for this meal's current goal"),
                 }
                     for item in fallback_candidates[:limit]
             ],
@@ -1371,24 +1801,45 @@ class MealPlanService:
             "fallback_used": True,
         }
 
-    def format_plan_created_message(self, plan):
+    def format_plan_created_message(self, plan, locale="zh"):
+        locale = _normalize_locale(locale)
         meal_lines = []
         for meal_key in ["breakfast", "lunch", "dinner"]:
             schedule = plan["meal_schedule"][meal_key]
-            meal_lines.append(
-                f"- {schedule['label']}: {schedule['meal_time']} 用餐，{schedule['push_time']} 推送"
-            )
+            meal_label = _meal_label_for_locale(meal_key, schedule, locale)
+            if locale == "en":
+                meal_lines.append(f"- {meal_label}: eat at {schedule['meal_time']}, push at {schedule['push_time']}")
+            else:
+                meal_lines.append(f"- {meal_label}: {schedule['meal_time']} 用餐，{schedule['push_time']} 推送")
 
         first_days = plan.get("days", [])[:3]
-        preview_lines = []
-        for day in first_days:
-            preview_lines.append(f"- {day['date']} | {day['theme']}")
+        preview_lines = [f"- {day['date']} | {_theme_name_for_locale(day, locale)}" for day in first_days]
 
         constraint_lines = list(plan.get("constraints", {}).get("notes", []))
         if not constraint_lines:
-            constraint_lines = ["- 当前按通用健康约束生成，后续可继续根据你的偏好微调。"]
-        else:
-            constraint_lines = [f"- {item}" for item in constraint_lines]
+            constraint_lines = ["当前按通用健康约束生成，后续可继续根据你的偏好微调。"]
+        constraint_lines = [f"- {_translate_constraint_note(item, locale)}" for item in constraint_lines]
+
+        if locale == "en":
+            return "\n".join(
+                [
+                    "**Meal Plan Created**",
+                    f"Goal: `{plan.get('goal_label_en') or plan['goal_label']}`",
+                    f"Period: `{plan['start_date']}` plus `{plan['duration_days']}` consecutive days",
+                    f"Strategy: {plan.get('summary_en') or plan['summary']}",
+                    "",
+                    "**Meal Push Schedule**",
+                    *meal_lines,
+                    "",
+                    "**Detected Health Constraints**",
+                    *constraint_lines,
+                    "",
+                    "**Preview of the First 3 Days**",
+                    *preview_lines,
+                    "",
+                    f"_{_recommendation_source_note_for_locale(plan.get('recommendation_source', 'unknown'), locale)}_",
+                ]
+            )
 
         return "\n".join(
             [
@@ -1406,14 +1857,28 @@ class MealPlanService:
                 "**前 3 天主题预览**",
                 *preview_lines,
                 "",
-                f"_{_recommendation_source_note(plan.get('recommendation_source', 'unknown'))}_",
+                f"_{_recommendation_source_note_for_locale(plan.get('recommendation_source', 'unknown'), locale)}_",
             ]
         )
 
-    def format_plan_status_message(self, plan):
+    def format_plan_status_message(self, plan, locale="zh"):
+        locale = _normalize_locale(locale)
         if not plan:
+            if locale == "en":
+                return "There is no active meal plan yet. You can say: I want to lose weight, give me a meal plan for the next month."
             return "当前还没有激活的饮食计划。你可以直接说：我想减肥，给我未来一个月的用餐计划。"
         sent_count = len(plan.get("sent_log", {}))
+        if locale == "en":
+            return "\n".join(
+                [
+                    "**Current Meal Plan**",
+                    f"Status: `{plan.get('status', 'unknown')}`",
+                    f"Goal: `{plan.get('goal_label_en') or plan.get('goal_label', '')}`",
+                    f"Start date: `{plan.get('start_date', '')}`",
+                    f"Meals already sent: `{sent_count}`",
+                    f"Recommendation source: `{_recommendation_source_label_for_locale(plan.get('recommendation_source', 'unknown'), locale)}`",
+                ]
+            )
         return "\n".join(
             [
                 "**当前饮食计划**",
@@ -1421,7 +1886,7 @@ class MealPlanService:
                 f"目标: `{plan.get('goal_label', '')}`",
                 f"开始日期: `{plan.get('start_date', '')}`",
                 f"已发送餐次: `{sent_count}`",
-                f"推荐来源: `{_recommendation_source_label(plan.get('recommendation_source', 'unknown'))}`",
+                f"推荐来源: `{_recommendation_source_label_for_locale(plan.get('recommendation_source', 'unknown'), locale)}`",
             ]
         )
 
@@ -1496,7 +1961,8 @@ class MealPlanService:
             return {"status": "success"}
         return {"status": "error", "msg": f"plan not found: {plan_id}"}
 
-    def format_push_message(self, push):
+    def format_push_message(self, push, locale="zh"):
+        locale = _normalize_locale(locale)
         day_plan = push["day_plan"]
         meal_spec = push["meal_spec"]
         candidates = push.get("display_candidates") or []
@@ -1504,66 +1970,121 @@ class MealPlanService:
         candidate_lines = []
         if candidates:
             for idx, item in enumerate(candidates, start=1):
-                candidate_lines.extend(
-                    [
-                        f"{idx}. **{item['item_name']}**",
-                        f"店铺：{item.get('store_name', '待手机美团确认')}",
-                        f"推荐理由：{item.get('reason', '整体更接近今天这顿的健康目标')}",
-                        f"价格：{item.get('price', '') or '待店内确认'}",
-                    ]
-                )
+                if locale == "en":
+                    candidate_lines.extend(
+                        [
+                            f"{idx}. **{item['item_name']}**",
+                            f"Store: {item.get('store_name', 'Pending phone Meituan confirmation')}",
+                            f"Why it fits: {_candidate_reason_for_locale(item, locale, '整体更接近今天这顿的健康目标', 'Overall it is closer to this meal target')}",
+                            f"Price: {item.get('price', '') or 'Pending in-store confirmation'}",
+                        ]
+                    )
+                else:
+                    candidate_lines.extend(
+                        [
+                            f"{idx}. **{item['item_name']}**",
+                            f"店铺：{item.get('store_name', '待手机美团确认')}",
+                            f"推荐理由：{item.get('reason', '整体更接近今天这顿的健康目标')}",
+                            f"价格：{item.get('price', '') or '待店内确认'}",
+                        ]
+                    )
         else:
-            candidate_lines.append("- 当前没有匹配到合适候选，建议按今天的目标关键词手动搜索。")
+            candidate_lines.append(
+                "- No strong candidate matched yet. Try searching manually with today's target keywords."
+                if locale == "en"
+                else "- 当前没有匹配到合适候选，建议按今天的目标关键词手动搜索。"
+            )
 
         cart_lines = []
         if cart_action.get("status") == "added":
             summary = cart_action.get("cart_summary", {})
-            cart_lines = [
-                "**已自动加入购物车**",
-                f"- 商家: {cart_action.get('store_name', '')}",
-                f"- 商品: {cart_action.get('item_name', '')}",
-                f"- 单价: {cart_action.get('item_price', '') or summary.get('total_price', '')}",
-            ]
+            if locale == "en":
+                cart_lines = [
+                    "**Added to Cart Automatically**",
+                    f"- Store: {cart_action.get('store_name', '')}",
+                    f"- Item: {cart_action.get('item_name', '')}",
+                    f"- Unit price: {cart_action.get('item_price', '') or summary.get('total_price', '')}",
+                ]
+            else:
+                cart_lines = [
+                    "**已自动加入购物车**",
+                    f"- 商家: {cart_action.get('store_name', '')}",
+                    f"- 商品: {cart_action.get('item_name', '')}",
+                    f"- 单价: {cart_action.get('item_price', '') or summary.get('total_price', '')}",
+                ]
             if summary.get("total_price"):
-                cart_lines.append(f"- 当前购物车合计: {summary['total_price']}")
+                cart_lines.append(f"- {'Current cart total' if locale == 'en' else '当前购物车合计'}: {summary['total_price']}")
             if summary.get("shortage"):
-                cart_lines.append(f"- 当前状态: {summary['shortage']}")
+                cart_lines.append(f"- {'Current status' if locale == 'en' else '当前状态'}: {summary['shortage']}")
             if summary.get("shipping_text"):
-                cart_lines.append(f"- 配送信息: {summary['shipping_text']}")
+                cart_lines.append(f"- {'Delivery info' if locale == 'en' else '配送信息'}: {summary['shipping_text']}")
             if summary.get("cart_cta"):
-                cart_lines.append(f"- 按钮状态: {summary['cart_cta']}")
-            cart_lines.append("- 你现在可以直接去手机美团里确认并手动支付。")
+                cart_lines.append(f"- {'Button state' if locale == 'en' else '按钮状态'}: {summary['cart_cta']}")
+            cart_lines.append(
+                "- You can now open Meituan on the phone to confirm and pay manually."
+                if locale == "en"
+                else "- 你现在可以直接去手机美团里确认并手动支付。"
+            )
         elif cart_action.get("status"):
-            cart_lines = [
-                "**购物车自动处理结果**",
-            ]
+            cart_lines = ["**Cart Automation Result**"] if locale == "en" else ["**购物车自动处理结果**"]
             if cart_action.get("store_name"):
-                cart_lines.append(f"- 店铺: {cart_action.get('store_name')}")
+                cart_lines.append(f"- {'Store' if locale == 'en' else '店铺'}: {cart_action.get('store_name')}")
             if cart_action.get("item_name"):
-                cart_lines.append(f"- 识别商品: {cart_action.get('item_name')}")
+                cart_lines.append(f"- {'Detected item' if locale == 'en' else '识别商品'}: {cart_action.get('item_name')}")
             if cart_action.get("item_price"):
-                cart_lines.append(f"- 识别价格: {cart_action.get('item_price')}")
+                cart_lines.append(f"- {'Detected price' if locale == 'en' else '识别价格'}: {cart_action.get('item_price')}")
             if cart_action.get("status") == "skipped_safety_check":
-                cart_lines.append("- 已为了安全起见跳过自动加购，你可以根据上面的候选自行确认。")
+                cart_lines.append(
+                    "- Auto add-to-cart was skipped for safety. You can confirm manually from the candidates above."
+                    if locale == "en"
+                    else "- 已为了安全起见跳过自动加购，你可以根据上面的候选自行确认。"
+                )
             if cart_action.get("status") == "needs_spec_selection":
-                cart_lines.append("- 当前商品需要手动选择规格，我已经帮你定位到店铺页。")
-                cart_lines.append("- 你现在可以直接在手机美团里点“选规格”，确认后再支付。")
+                cart_lines.append(
+                    "- This item has already reached the ordering step and now needs manual spec or combo selection."
+                    if locale == "en"
+                    else "- 当前商品已经进入点餐步骤，但还需要手动选择规格/套餐。"
+                )
+                cart_lines.append(
+                    "- The demo has opened the spec selector when possible. You can confirm the choice and continue ordering manually."
+                    if locale == "en"
+                    else "- 如果页面已弹出选规格/选套餐面板，你现在可以直接确认后继续下单。"
+                )
             if cart_action.get("status") == "no_addable_item_found":
-                cart_lines.append("- 已打开推荐店铺，但当前没稳定定位到可直接加购按钮。")
-                cart_lines.append("- 你现在可以直接在手机美团里查看该店铺并手动选择这一餐。")
+                cart_lines.append(
+                    "- The recommended store page was opened, but the demo could not reliably find an add-to-cart button."
+                    if locale == "en"
+                    else "- 已打开推荐店铺，但当前没稳定定位到可直接加购按钮。"
+                )
+                cart_lines.append(
+                    "- You can now inspect the store directly in Meituan and choose this meal manually."
+                    if locale == "en"
+                    else "- 你现在可以直接在手机美团里查看该店铺并手动选择这一餐。"
+                )
             if cart_action.get("status") == "no_result_card_found":
-                cart_lines.append("- 当前没有稳定解析到商家卡片，建议你按上面的候选词手动搜索一次。")
+                cart_lines.append(
+                    "- The demo could not reliably parse a store card this time. Try one manual search with the suggested keywords above."
+                    if locale == "en"
+                    else "- 当前没有稳定解析到商家卡片，建议你按上面的候选词手动搜索一次。"
+                )
+
+        meal_label = push.get("meal_label_en") or push.get("meal_label", "")
+        if locale != "en":
+            meal_label = push.get("meal_label", meal_label)
+        theme_name = _theme_name_for_locale(day_plan, locale)
+        goal_note = _goal_note_for_locale(meal_spec, locale)
+        query_display = _query_for_locale(meal_spec, locale)
 
         return "\n".join(
             [
-                f"**{push['meal_label']}推荐提醒**",
-                f"日期: `{push['date']}`",
-                f"建议用餐时间: `{push['meal_time']}`",
-                f"今日主题: `{day_plan['theme']}`",
-                f"这一顿目标: {meal_spec['goal_note']}",
-                f"建议搜索词: `{meal_spec['query']}`",
+                f"**{meal_label} Recommendation Reminder**" if locale == "en" else f"**{meal_label}推荐提醒**",
+                f"Date: `{push['date']}`" if locale == "en" else f"日期: `{push['date']}`",
+                f"Suggested meal time: `{push['meal_time']}`" if locale == "en" else f"建议用餐时间: `{push['meal_time']}`",
+                f"Today's theme: `{theme_name}`" if locale == "en" else f"今日主题: `{theme_name}`",
+                f"This meal is aiming for: {goal_note}" if locale == "en" else f"这一顿目标: {goal_note}",
+                f"Suggested search: `{query_display}`" if locale == "en" else f"建议搜索词: `{query_display}`",
                 "",
-                "**候选餐**",
+                "**Meal Candidates**" if locale == "en" else "**候选餐**",
                 *candidate_lines,
                 "",
                 *cart_lines,

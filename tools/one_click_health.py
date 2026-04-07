@@ -151,33 +151,17 @@ def load_subtasks_from_main_sop(project_root: Optional[Path] = None) -> list[dic
     return list(DEFAULT_SUBTASKS)
 
 
-def build_one_click_analysis_prompt(
-    time_window_days: int, selected_task_ids: list, output_language: str = "auto"
-) -> str:
+def build_one_click_analysis_prompt(time_window_days: int, selected_task_ids: list) -> str:
     tasks_str = json.dumps(selected_task_ids, ensure_ascii=False)
-    lang = (output_language or "auto").strip().lower()
-    if lang not in {"zh", "en", "auto"}:
-        lang = "auto"
-    lang_line = (
-        "请使用中文输出最终综合报告。"
-        if lang == "zh"
-        else (
-            "Please output the final integrated report in English."
-            if lang == "en"
-            else "最终综合报告语言跟随用户本轮语言偏好。"
-        )
-    )
     return (
         f"{PROMPT_TAG_HEALTH_ANALYSIS}\n"
         f"mode={MODE_HEALTH_ANALYSIS}\n"
         f"time_window_days={time_window_days}\n"
         f"tasks={tasks_str}\n"
-        f"output_language={lang}\n"
         f"output_format=integrated_report_v1\n\n"
         f"请先读取 {MAIN_SOP_RELPATH} 获取执行规范，"
         f"然后按tasks列表顺序串行执行各子任务SOP，最后按SOP中定义的综合报告模板输出完整报告。\n"
-        f"分析时间范围：最近{time_window_days}天。\n"
-        f"{lang_line}"
+        f"分析时间范围：最近{time_window_days}天。"
     )
 
 

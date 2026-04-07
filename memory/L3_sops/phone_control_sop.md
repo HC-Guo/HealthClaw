@@ -37,31 +37,25 @@ phone_control(action="check_connection")  # 仅任务开始首次执行；后续
    
 2. **截图分析**（视觉理解，适合复杂界面）：
    ```
-   phone_screen_analyze(question="当前页面结构和可操作区域是什么？")
+   phone_control(action="screenshot_analyze", question="当前页面结构和可操作区域是什么？")
    ```
    截取屏幕并通过 LLM 视觉能力分析。
 
 ### Step 3: 决策下一步操作
 根据感知结果，决定：
-- 需要点击哪个元素？→ **优先原子动作** `tap_keyword_confirm`（内部封装“找元素+点+确认”）
+- 需要点击哪个元素？→ 使用元素的 (cx, cy) 坐标
 - 需要滑动查看更多？→ scroll_down / scroll_up
 - 需要输入文字？→ input_text
 - 需要返回？→ press_key(back)
 
 ### Step 4: 执行操作
 ```
-phone_control(action="tap_keyword_confirm", keyword="订单", confirm_keyword="订单列表")  # 优先：关键词点击+确认
 phone_control(action="tap", x=540, y=1200)        # 点击
 phone_control(action="swipe", x1=540, y1=1600, x2=540, y2=400)  # 滑动
 phone_control(action="input_text", text="示例输入")    # 输入
 phone_control(action="press_key", key="back")       # 返回
 phone_control(action="launch_app", app="目标应用名或包名")  # 启动App
 ```
-**推荐点击顺序（P0）**：
-1. `phone_control(action="tap_keyword_confirm", keyword="目标关键词")`
-2. 若返回未命中/不确定：`phone_control(action="ui_dump", keyword="目标关键词", clickable_only=true)` 后手动 `tap`
-3. 若 `ui_dump` 仍无法定位，再用 `phone_screen_analyze` 做视觉兜底
-
 **启动失败时**（以 Agent 自行匹配为准，工具只做兜底）：
 1. **主流程**：工具仅返回本机已安装应用列表（完整或前 N 个）。**由 Agent 根据用户描述与该列表自行做关键词/语义匹配**，选出最可能的目标包名并用 `launch_app(app="包名")` 重试。不依赖代码内预置关键词表。
 2. **兜底**：若 Agent 判断列表中**无与用户描述相关的包**，则停止任务并向用户说明，或建议用户说出具体应用名称。勿把预置名称（如「华为健康」）当成本机已安装。

@@ -36,15 +36,15 @@ but tries to explain what happened so the right person gets it in time and under
 
 <p align="center">
   <video
-    poster="../readme_media/showcase_amap_hospital_cover_en.png"
-    src="https://github.com/user-attachments/assets/6afaa031-aad4-4a47-8c9d-0c03c902a448"
+    poster="../readme_media/showcase_amap_hospital_cover.png"
+    src="https://github.com/user-attachments/assets/75a6ccb7-4b65-4d64-aa63-1820f004e9d6"
     controls
     muted
     playsinline
     preload="metadata"
     width="800"
   >
-    If the player does not appear, <a href="https://github.com/user-attachments/assets/6afaa031-aad4-4a47-8c9d-0c03c902a448">open the video directly</a>.
+    If the player does not appear, <a href="https://github.com/user-attachments/assets/75a6ccb7-4b65-4d64-aa63-1820f004e9d6">open the video directly</a>.
   </video>
 </p>
 
@@ -59,15 +59,15 @@ and bridge “knowing you should go” to “actually starting to go”—you on
 
 <p align="center">
   <video
-    poster="../readme_media/showcase_genomics_cover_en.png"
-    src="https://github.com/user-attachments/assets/866eed2b-d231-4c2c-b5b8-c3b059641524"
+    poster="../readme_media/showcase_genomics_cover.png"
+    src="https://github.com/user-attachments/assets/90e4d536-c684-4da4-af74-92e84cb00430"
     controls
     muted
     playsinline
     preload="metadata"
     width="800"
   >
-    If the player does not appear, <a href="https://github.com/user-attachments/assets/866eed2b-d231-4c2c-b5b8-c3b059641524">open the video directly</a>.
+    If the player does not appear, <a href="https://github.com/user-attachments/assets/90e4d536-c684-4da4-af74-92e84cb00430">open the video directly</a>.
   </video>
 </p>
 
@@ -82,15 +82,15 @@ turning heavy pipelines into easier-to-read takeaways.</em></p>
 
 <p align="center">
   <video
-    poster="../readme_media/showcase_proteomics_cover_en.png"
-    src="https://github.com/user-attachments/assets/a3733323-9a9e-4793-b77f-a3d1f488e392"
+    poster="../readme_media/showcase_proteomics_cover.png"
+    src="https://github.com/user-attachments/assets/a2eb84ff-9450-4297-9306-95bcc5dfeecc"
     controls
     muted
     playsinline
     preload="metadata"
     width="800"
   >
-    If the player does not appear, <a href="https://github.com/user-attachments/assets/a3733323-9a9e-4793-b77f-a3d1f488e392">open the video directly</a>.
+    If the player does not appear, <a href="https://github.com/user-attachments/assets/a2eb84ff-9450-4297-9306-95bcc5dfeecc">open the video directly</a>.
   </video>
 </p>
 
@@ -105,15 +105,15 @@ to assist clinicians and help patients understand.</em></p>
 
 <p align="center">
   <video
-    poster="../readme_media/showcase_imaging_cover_en.png"
-    src="https://github.com/user-attachments/assets/61dff23e-a38d-4219-955b-b4c46d76ead2"
+    poster="../readme_media/showcase_imaging_cover.png"
+    src="https://github.com/user-attachments/assets/f0726feb-a715-47a3-b2d4-e3b4baeae9c4"
     controls
     muted
     playsinline
     preload="metadata"
     width="800"
   >
-    If the player does not appear, <a href="https://github.com/user-attachments/assets/61dff23e-a38d-4219-955b-b4c46d76ead2">open the video directly</a>.
+    If the player does not appear, <a href="https://github.com/user-attachments/assets/f0726feb-a715-47a3-b2d4-e3b4baeae9c4">open the video directly</a>.
   </video>
 </p>
 
@@ -128,15 +128,15 @@ so “watch and wait” vs “go soon” is less of a pure guess.</em></p>
 
 <p align="center">
   <video
-    poster="../readme_media/xiaomi_health_demo_cover_en.png"
-    src="https://github.com/user-attachments/assets/f3021c5a-6ff8-4508-aa6c-0844327ba458"
+    poster="../readme_media/xiaomi_health_demo_cover.png"
+    src="https://github.com/user-attachments/assets/c475b725-ad64-4b02-ac49-d38ffbbc710a"
     controls
     muted
     playsinline
     preload="metadata"
     width="800"
   >
-    If the player does not appear, <a href="https://github.com/user-attachments/assets/f3021c5a-6ff8-4508-aa6c-0844327ba458">open the video directly</a>.
+    If the player does not appear, <a href="https://github.com/user-attachments/assets/c475b725-ad64-4b02-ac49-d38ffbbc710a">open the video directly</a>.
   </video>
 </p>
 
@@ -151,15 +151,15 @@ then suggests practical adjustments rather than a vague “get more rest.”</em
 
 <p align="center">
   <video
-    poster="../readme_media/showcase_huawei_health_cover_en.png"
-    src="https://github.com/user-attachments/assets/6e422338-8289-4e24-a281-d671e992e750"
+    poster="../readme_media/showcase_huawei_health_cover.png"
+    src="https://github.com/user-attachments/assets/2a460a3c-ca07-436c-ab24-3e18d8575e8c"
     controls
     muted
     playsinline
     preload="metadata"
     width="800"
   >
-    If the player does not appear, <a href="https://github.com/user-attachments/assets/6e422338-8289-4e24-a281-d671e992e750">open the video directly</a>.
+    If the player does not appear, <a href="https://github.com/user-attachments/assets/2a460a3c-ca07-436c-ab24-3e18d8575e8c">open the video directly</a>.
   </video>
 </p>
 

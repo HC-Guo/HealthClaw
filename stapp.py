@@ -505,7 +505,7 @@ if st.session_state.get("_show_health_plan_form", False):
         if run_clicked and selected_ids:
             st.session_state["_show_health_plan_form"] = False
             _prompt = och.build_one_click_analysis_prompt(
-                int(time_window), selected_ids, output_language=_loc()
+                int(time_window), selected_ids
             )
             _task_names = [
                 subtask_display_name_desc(row, _hl)[0]
@@ -526,6 +526,8 @@ if st.session_state.get("_pending_health_prompt"):
     _display = st.session_state.pop(
         "_pending_health_display", t("one_click_fallback_display")
     )
+    with st.chat_message("user"):
+        st.markdown(_display)
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         response = ""
