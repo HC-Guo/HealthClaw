@@ -9,7 +9,13 @@ if sys.stderr is None:
     sys.stderr = open(os.devnull, "w")
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from agent_loop import BaseHandler, StepOutcome, try_call_generator
+from agent_loop import (
+    BaseHandler,
+    StepOutcome,
+    _has_substantial_visible_answer,
+    _is_protocol_scaffold_answer,
+    try_call_generator,
+)
 
 from tools.one_click_health import (
     check_one_click_main_sop_file_patch_allowed,
@@ -215,6 +221,34 @@ def reset_session_tracker():
     global _session_tracker
     _session_tracker = SessionTracker()
     return _session_tracker
+
+
+def _extract_raw_tool_arg(raw, key):
+    text = str(raw or "")
+    match = re.search(rf'"{re.escape(key)}"\s*:\s*"([\s\S]*?)"\s*(?:,|\}})', text)
+    if not match:
+        return None
+    value = match.group(1)
+    try:
+        return json.loads(f'"{value}"')
+    except Exception:
+        return value
+
+
+def _normalize_code_run_args(args):
+    normalized = dict(args or {})
+    raw = normalized.get("_raw")
+    if raw and not any(normalized.get(k) for k in ("code", "script", "command")):
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                normalized.update({k: v for k, v in parsed.items() if v is not None})
+        except Exception:
+            for key in ("code", "script", "command", "cwd", "type", "timeout"):
+                value = _extract_raw_tool_arg(raw, key)
+                if value is not None:
+                    normalized[key] = value
+    return normalized
 
 
 def code_run(
@@ -815,19 +849,22 @@ class GenericAgentHandler(BaseHandler):
 
     def do_code_run(self, args, response):
         """执行代码片段，有长度限制，不允许代码中放大量数据，如有需要应当通过文件读取进行。"""
-        code_type = args.get("type", "python")
+        args = _normalize_code_run_args(args)
+        code_type = args.get("type") or (
+            "bash" if args.get("command") and not (args.get("code") or args.get("script")) else "python"
+        )
         # 从 response.content 中提取代码块, 匹配 ```python ... ``` 或 ```powershell ... ```
         pattern = rf"```{code_type}\n(.*?)\n```"
         matches = re.findall(pattern, response.content, re.DOTALL)
         warning = ""
         if not matches:
-            code = args.get("code")
+            code = args.get("code") or args.get("script") or args.get("command")
             if not code:
                 return StepOutcome(
                     None,
                     next_prompt=f"【系统错误】：你调用了 code_run，但未在先在回复正文中提供 ```{code_type} 代码块。请重新输出代码并附带工具调用。",
                 )
-            warning = "\n下次要记得先在回复正文中提供代码块，而不是放在参数中"
+            warning = "\n下次优先在回复正文中提供代码块；本次已兼容工具参数中的代码内容。"
         else:
             code = matches[
                 -1
@@ -882,8 +919,8 @@ class GenericAgentHandler(BaseHandler):
         if candidates:
             yield f"[ask_user] 候选项: {candidates}\n"
 
-        if self._is_dangerous_question(question, candidates):
-            yield "[ask_user] ⚠️ 检测到危险操作关键词，必须等待用户确认。\n"
+        if self._is_dangerous_question(question, candidates) or not getattr(self, "autonomous", False):
+            yield "[ask_user] ⚠️ 当前模式需要等待用户确认。\n"
             result = ask_user(question, candidates)
             return StepOutcome(result, next_prompt="", should_exit=True)
 
@@ -1071,6 +1108,20 @@ class GenericAgentHandler(BaseHandler):
         """为整个任务设定后续需要临时记忆的重点。"""
         key_info = args.get("key_info", "")
         related_sop = args.get("related_sop", "")
+        stale_external_task = re.search(
+            r"(Multi-omics|multi-omics|patient\s+\d{5,}|UKB|CVD risk assessment)",
+            f"{key_info}\n{related_sop}",
+        )
+        technical_scaffold_task = re.search(
+            r"(current task state|file path issues|L1_index\.json|I am Kiro|code development|"
+            r"protocol violations|工作目录|工作上下文|代码执行协议|系统配置|基础设施)",
+            f"{key_info}\n{related_sop}",
+            re.IGNORECASE,
+        )
+        if (stale_external_task and not getattr(self, "current_patient", None)) or technical_scaffold_task:
+            yield "[Info] 拒绝写入疑似外部任务或技术脚手架污染的 working checkpoint。\n"
+            reason = "technical_scaffold_task" if technical_scaffold_task else "stale_external_patient_task"
+            return StepOutcome({"status": "ignored", "reason": reason}, next_prompt=self._get_anchor_prompt())
         if key_info:
             self.key_info = key_info
         if related_sop:
@@ -1101,12 +1152,28 @@ class GenericAgentHandler(BaseHandler):
                 should_exit=False,
             )
 
+        if _is_protocol_scaffold_answer(content):
+            yield "[Warn] Detected protocol/workspace scaffold text instead of a final answer. Retrying original task.\n"
+            self._no_tool_consecutive = 0
+            return StepOutcome(
+                {},
+                next_prompt=(
+                    "[System] 上一轮输出的是协议或工作区自检话术，不是对用户原始问题的回答。"
+                    "请回到用户原始问题：如果需要历史信息，请使用可用记忆/文件读取工具；"
+                    "如果信息已经足够，请直接给出自然语言最终回答。"
+                ),
+                should_exit=False,
+            )
+
         code_block_pattern = r"```[a-zA-Z0-9_]*\n[\s\S]{100,}?```"
         m = re.search(code_block_pattern, content)
         if m:
             residual = content.replace(m.group(0), "")
             residual = re.sub(
                 r"<thinking>[\s\S]*?</thinking>", "", residual, flags=re.IGNORECASE
+            )
+            residual = re.sub(
+                r"<think>[\s\S]*?</think>", "", residual, flags=re.IGNORECASE
             )
             residual = re.sub(
                 r"<summary>[\s\S]*?</summary>", "", residual, flags=re.IGNORECASE
@@ -1123,18 +1190,23 @@ class GenericAgentHandler(BaseHandler):
                     should_exit=False,
                 )
 
+        if _has_substantial_visible_answer(content):
+            yield "[Info] 已生成实质可见回答，允许直接结束。\n"
+            self._no_tool_consecutive = 0
+            return StepOutcome(response, next_prompt=None, should_exit=True)
+
+        # 长期记忆关闭时，不再推动“是否调用 start_long_term_update”的额外轮次；
+        # probe/no-writeback 场景下，当前轮已有可见答案就直接结束，避免被历史失败带偏。
+        if not long_term_enabled:
+            yield "[Info] Long-term memory disabled，允许直接结束。\n"
+            self._no_tool_consecutive = 0
+            return StepOutcome(response, next_prompt=None, should_exit=True)
+
         self._no_tool_consecutive += 1
 
         early_turn = self._current_turn <= 3 and not self.tracker.failures
         if early_turn:
             yield "[Info] Early turn 且无失败记录，允许直接结束。\n"
-            self._no_tool_consecutive = 0
-            return StepOutcome(response, next_prompt=None, should_exit=True)
-
-        # 长期记忆关闭时，不再推动“是否调用 start_long_term_update”的额外轮次；
-        # 与 early turn 一样在无失败场景下直接结束，减少无效调用。
-        if not long_term_enabled and not self.tracker.failures:
-            yield "[Info] Long-term memory disabled 且无失败记录，允许直接结束。\n"
             self._no_tool_consecutive = 0
             return StepOutcome(response, next_prompt=None, should_exit=True)
 
@@ -1219,6 +1291,25 @@ class GenericAgentHandler(BaseHandler):
             print(prompt)
         except:
             pass
+        return prompt
+
+    def _get_current_user_question(self):
+        tracker = getattr(self, "tracker", None)
+        question = getattr(tracker, "task_goal", "") if tracker else ""
+        if question is None:
+            return ""
+        return re.sub(r"\s+", " ", str(question)).strip()[:500]
+
+    def _direct_answer_prompt(self, tool_context):
+        prompt = self._get_anchor_prompt()
+        question = self._get_current_user_question()
+        if question:
+            prompt += f"\n[当前用户问题]\n{question}"
+        prompt += (
+            f"\n[{tool_context}] 工具结果已经返回。请基于上面的 <tool_result> 和当前健康记忆，"
+            "直接回答当前用户问题。不要输出功能菜单、能力介绍、工作流路由、"
+            "患者 eid/UKB 请求或“还想聊什么”。如果信息不足，只说明缺少哪一项必要信息。"
+        )
         return prompt
 
     def next_prompt_patcher(self, next_prompt, outcome, turn):

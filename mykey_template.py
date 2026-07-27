@@ -8,6 +8,14 @@ oai_config = {
     'model': 'gpt-4o'
 }
 
+# Qwen / DashScope OpenAI-compatible 示例：
+# 复制到本地 mykey.py 后，把 apikey 改成真实密钥。mykey.py 已被 .gitignore 忽略。
+# oai_config = {
+#     'apikey': 'YOUR_DASHSCOPE_API_KEY',
+#     'apibase': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+#     'model': 'qwen3.7-plus'
+# }
+
 # 可选：Sider 等
 # sider_cookie = 'YOUR_SIDER_COOKIE_IF_NEEDED'
 

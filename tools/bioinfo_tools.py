@@ -8,6 +8,7 @@ import time
 import json
 import subprocess
 import tempfile
+import xml.etree.ElementTree as ET
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
@@ -24,8 +25,41 @@ except ImportError:
 BLAST_API_BASE = "https://blast.ncbi.nlm.nih.gov/Blast.cgi"
 
 
+def _parse_blast_xml_hits(raw_xml, max_hits=20):
+    """Parse compact hit/HSP evidence from NCBI BLAST XML."""
+    hits = []
+    try:
+        root = ET.fromstring(raw_xml)
+    except ET.ParseError:
+        return hits
+    for hit in root.findall(".//Hit")[:max_hits]:
+        hsps = []
+        for hsp in hit.findall(".//Hsp")[:3]:
+            hsps.append({
+                "bit_score": hsp.findtext("Hsp_bit-score"),
+                "score": hsp.findtext("Hsp_score"),
+                "evalue": hsp.findtext("Hsp_evalue"),
+                "identity": hsp.findtext("Hsp_identity"),
+                "align_len": hsp.findtext("Hsp_align-len"),
+                "query_from": hsp.findtext("Hsp_query-from"),
+                "query_to": hsp.findtext("Hsp_query-to"),
+                "hit_from": hsp.findtext("Hsp_hit-from"),
+                "hit_to": hsp.findtext("Hsp_hit-to"),
+                "gaps": hsp.findtext("Hsp_gaps"),
+            })
+        hits.append({
+            "id": hit.findtext("Hit_id"),
+            "accession": hit.findtext("Hit_accession"),
+            "def": hit.findtext("Hit_def"),
+            "len": hit.findtext("Hit_len"),
+            "hsps": hsps,
+        })
+    return hits
+
+
 def blast_search(query, program="blastp", database="swissprot", evalue=1e-5,
-                 email="agent@local", tool_name="SEDA-bioinfo", max_wait_seconds=120):
+                 email="agent@local", tool_name="SEDA-bioinfo", max_wait_seconds=120,
+                 entrez_query=None, megablast=None, hitlist_size=20, poll_interval=15):
     """
     使用 NCBI BLAST 常见 URL API 提交搜索并轮询结果。
     query: 序列字符串或单条 FASTA（可含 >id 行）
@@ -51,7 +85,12 @@ def blast_search(query, program="blastp", database="swissprot", evalue=1e-5,
         "EXPECT": str(evalue),
         "EMAIL": email,
         "TOOL": tool_name,
+        "HITLIST_SIZE": str(hitlist_size),
     }
+    if entrez_query:
+        params_put["ENTREZ_QUERY"] = str(entrez_query)
+    if megablast is not None:
+        params_put["MEGABLAST"] = "on" if megablast else "off"
     url_put = BLAST_API_BASE + "?" + urlencode(params_put)
 
     try:
@@ -71,16 +110,17 @@ def blast_search(query, program="blastp", database="swissprot", evalue=1e-5,
     if not rid:
         return {"status": "error", "msg": "BLAST 未返回 RID", "raw": body[:500]}
     rid = rid.group(1).strip()
-    wait_max = min(max_wait_seconds, int(rtoe.group(1)) + 10 if rtoe else 120)
+    wait_max = max_wait_seconds if max_wait_seconds else (int(rtoe.group(1)) + 60 if rtoe else 120)
 
     # 轮询结果（NCBI 建议至少间隔 10 秒）
-    params_get = {"CMD": "Get", "RID": rid, "FORMAT_TYPE": "XML", "ALIGNMENTS": 50}
+    params_get = {"CMD": "Get", "RID": rid, "FORMAT_TYPE": "XML", "ALIGNMENTS": str(hitlist_size), "DESCRIPTIONS": str(hitlist_size)}
     url_get = BLAST_API_BASE + "?" + urlencode(params_get)
     start = time.time()
     last_status = ""
+    last_body = ""
 
     while time.time() - start < wait_max:
-        time.sleep(max(10, 1))  # 至少 10 秒再查
+        time.sleep(max(10, int(poll_interval or 15)))  # NCBI 建议至少间隔 10 秒
         try:
             if _HAS_REQUESTS:
                 r = requests.get(url_get, timeout=60)
@@ -92,28 +132,37 @@ def blast_search(query, program="blastp", database="swissprot", evalue=1e-5,
         except Exception as e:
             last_status = str(e)
             continue
+        last_body = body
+
+        if "<BlastOutput" in body:
+            hits = _parse_blast_xml_hits(body, max_hits=hitlist_size)
+            return {
+                "status": "success",
+                "rid": rid,
+                "hits": hits,
+                "raw_xml": body[:20000],
+                "msg": f"找到 {len(hits)} 个 hit(s)",
+                "database": database,
+                "program": program,
+            }
 
         if "Status=" in body:
             status = re.search(r"Status=(\w+)", body)
             if status and status.group(1) == "READY":
-                # 解析简单 hit 列表（从 XML 中摘取）
-                hits = []
-                for hit in re.finditer(r"<Hit_id>([^<]+)</Hit_id>\s*<Hit_def>([^<]*)</Hit_def>", body):
-                    hits.append({"id": hit.group(1), "def": hit.group(2)})
-                for hit in re.finditer(r"<Hsp_evalue>([^<]+)</Hsp_evalue>\s*<Hsp_identity>([^<]+)</Hsp_identity>", body):
-                    pass  # 可与 hits 合并
-                return {
-                    "status": "success",
-                    "rid": rid,
-                    "hits": hits[:20],
-                    "raw_xml": body[:8000],
-                    "msg": f"找到 {len(hits)} 个 hit(s)"
-                }
+                last_status = "READY_no_xml"
+                continue
             last_status = status.group(1) if status else "UNKNOWN"
         if "Error" in body or "error" in body.lower():
             return {"status": "error", "msg": "BLAST 返回错误", "raw": body[:1000]}
 
-    return {"status": "error", "msg": f"BLAST 超时(>{wait_max}s)，最后状态: {last_status}", "rid": rid}
+    return {
+        "status": "error",
+        "msg": f"BLAST 超时(>{wait_max}s)，最后状态: {last_status}",
+        "rid": rid,
+        "database": database,
+        "program": program,
+        "raw": last_body[:1000],
+    }
 
 
 # ---------- DAVID 富集（需邮箱注册，此处返回说明 + 占位） ----------

@@ -1,7 +1,7 @@
 [
   {"type": "function", "function": {
     "name": "load_patient",
-    "description": "加载患者的基础临床数据（人口学、生化指标、既往史、影像报告等），返回自然语言摘要。这是每个分析任务的第一步。cost=0.01。",
+    "description": "加载 UKB/eid 研究队列患者的基础临床数据（人口学、生化指标、既往史、影像报告等），返回自然语言摘要。仅用于明确给出 UKB eid、队列患者编号或多组学诊断/风险评估任务；不用于普通个人健康画像、之前记录的用药/过敏史/长期目标等记忆查询。cost=0.01。",
     "parameters": {"type": "object", "properties": {
       "eid": {"type": "string", "description": "UKB 患者唯一标识符 (eid)"},
       "disease_context": {"type": "string", "description": "本次分析的疾病背景（如 breast_cancer, CAD, T2D），用于后续策略查询"}
@@ -29,6 +29,97 @@
     "parameters": {"type": "object", "properties": {
       "modality": {"type": "string", "enum": ["brain_mri", "cardiac_mri", "dxa", "retinal", "ultrasound", "abdominal_mri"], "description": "影像模态"}
     }, "required": ["modality"]}
+  }},
+  {"type": "function", "function": {
+    "name": "route_task_specific_tools",
+    "description": "根据当前可见任务类型/模态/数据集选择专业工具候选，并明确哪些通用工具不应作为主证据。只做路由，不读取 gold，不执行未配置外部模型。适用：GeneTuring、眼底、皮肤、CT、MRI、超声、EHR、蛋白、多组学任务。cost=0.01。",
+    "parameters": {"type": "object", "properties": {
+      "task_key": {"type": "string", "description": "当前任务名或数据集 key，如 GeneTuring、ODIR5K、NoduleMNIST3D、UCI Thyroid"},
+      "case_metadata": {"type": "object", "description": "当前样本可见 metadata，只能包含 dataset、domain、task_name、question、visible_input、visible_metadata 等预测阶段可见字段"},
+      "max_tool_calls": {"type": "integer", "description": "最多选择几个工具，默认 3", "default": 3}
+    }, "required": ["task_key"]}
+  }},
+  {"type": "function", "function": {
+    "name": "execute_task_specific_tool",
+    "description": "执行 route_task_specific_tools 返回的已实现专业工具。只能传入当前样本预测阶段可见的 image_path、label_options、visible_input、question、dataset 等字段；工具输出会标注 evidence_strength/recommended_use/class_bias_risk，弱工具不能直接覆盖最终诊断。cost=0.05。",
+    "parameters": {"type": "object", "properties": {
+      "tool_name": {"type": "string", "description": "route_task_specific_tools 返回的 selected_tools 中的工具名，例如 lung_ct_vit_slice_classify、brain_mri_siglip_tumor_classify、liver_ultrasound_steatosis_classify、uci_diabetes_xgb_readmission_classify"},
+      "task_key": {"type": "string", "description": "当前任务名或数据集 key，与 route_task_specific_tools 使用的 task_key 一致"},
+      "case_metadata": {"type": "object", "description": "当前样本可见 metadata；不能包含 gold_label、gold_answer、预测后结果或未来样本信息"}
+    }, "required": ["tool_name", "task_key", "case_metadata"]}
+  }},
+  {"type": "function", "function": {
+    "name": "flair_fundus_status",
+    "description": "检查 FLAIR 眼底 foundation model 是否可导入、是否可通过 HuggingFace 加载权重。只做可用性检查，不读取 gold。适用：ODIR5K / fundus 任务。cost=0.01。",
+    "parameters": {"type": "object", "properties": {
+      "source_dir": {"type": "string", "description": "可选，本地 FLAIR 源码目录；也可通过 HEALTHCLAW_FLAIR_SOURCE_DIR 配置"},
+      "model_id": {"type": "string", "description": "HuggingFace model id，默认 jusiro2/FLAIR", "default": "jusiro2/FLAIR"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "flair_fundus_zero_shot",
+    "description": "使用真实 FLAIR retina vision-language foundation model 对当前可见眼底图像做 zero-shot evidence scoring，返回类别候选分数和眼底特征分数。不会读取 gold。cost=0.05。",
+    "parameters": {"type": "object", "properties": {
+      "image_path": {"type": "string", "description": "当前样本可见眼底图像路径"},
+      "label_options": {"type": "array", "items": {"type": "string"}, "description": "当前样本可见候选标签列表"},
+      "source_dir": {"type": "string", "description": "可选，本地 FLAIR 源码目录；也可通过 HEALTHCLAW_FLAIR_SOURCE_DIR 配置"},
+      "model_id": {"type": "string", "description": "HuggingFace model id，默认 jusiro2/FLAIR", "default": "jusiro2/FLAIR"},
+      "prompt_mode": {"type": "string", "enum": ["domain_knowledge", "direct"], "description": "domain_knowledge 使用 FLAIR 官方专家描述 prototype；direct 只使用标签文本", "default": "domain_knowledge"}
+    }, "required": ["image_path"]}
+  }},
+  {"type": "function", "function": {
+    "name": "skin_isic_efficientnet_status",
+    "description": "检查 HuggingFace/timm ISIC2019 EfficientNet-B1 skin lesion classifier 是否可用。只做可用性检查，不读取 gold。适用：ISIC2019、DermaMNIST、PAD-UFES 的皮肤病变图像任务。cost=0.01。",
+    "parameters": {"type": "object", "properties": {
+      "model_dir": {"type": "string", "description": "可选，本地模型目录；也可通过 HEALTHCLAW_SKIN_MODEL_DIR 配置"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "skin_isic_efficientnet_classify",
+    "description": "使用真实 ISIC2019 EfficientNet-B1 模型对当前可见皮肤病变图像做分类证据评分。模型覆盖 6 类，不覆盖 dermatofibroma/vascular lesion；不会读取 gold。cost=0.05。",
+    "parameters": {"type": "object", "properties": {
+      "image_path": {"type": "string", "description": "当前样本可见皮肤图像路径"},
+      "label_options": {"type": "array", "items": {"type": "string"}, "description": "当前样本可见候选标签列表"},
+      "model_dir": {"type": "string", "description": "可选，本地模型目录；也可通过 HEALTHCLAW_SKIN_MODEL_DIR 配置"}
+    }, "required": ["image_path"]}
+  }},
+  {"type": "function", "function": {
+    "name": "monai_bundle_status",
+    "description": "检查真实 MONAI Model Zoo 医学影像 bundle 是否已安装/下载。适用：CT lung nodule、Brain MRI tumor segmentation 等专业影像工具接入前的可用性检查；不会读取 gold，也不会直接输出诊断标签。cost=0.01。",
+    "parameters": {"type": "object", "properties": {
+      "bundle_key": {"type": "string", "enum": ["ct_lung_nodule_detection", "mri_brats_segmentation"], "description": "要检查的 MONAI bundle key"},
+      "bundle_dir": {"type": "string", "description": "可选，本地 MONAI bundle 根目录；默认读取 HEALTHCLAW_MONAI_BUNDLE_DIR 或 external_models/monai_bundles"}
+    }, "required": ["bundle_key"]}
+  }},
+  {"type": "function", "function": {
+    "name": "monai_bundle_command",
+    "description": "生成官方 MONAI bundle inference 命令，不自动执行。用于把 CT/MRI 专业模型接入评测脚本前的可复现命令准备；输入路径必须来自当前可见样本或显式配置。cost=0.01。",
+    "parameters": {"type": "object", "properties": {
+      "bundle_key": {"type": "string", "enum": ["ct_lung_nodule_detection", "mri_brats_segmentation"], "description": "MONAI bundle key"},
+      "output_dir": {"type": "string", "description": "推理输出目录"},
+      "bundle_dir": {"type": "string", "description": "可选，本地 MONAI bundle 根目录"},
+      "dataset_dir": {"type": "string", "description": "可选，当前任务可见/已授权的影像数据目录"},
+      "extra_overrides": {"type": "array", "items": {"type": "string"}, "description": "可选 MONAI config override 参数，必须来自当前可见输入或固定运行配置"}
+    }, "required": ["bundle_key", "output_dir"]}
+  }},
+  {"type": "function", "function": {
+    "name": "esm_variant_effect_status",
+    "description": "检查 FAIR ESM protein language model variant-effect wrapper 是否可导入、权重是否可下载。只做可用性检查，不读取 gold。适用：ProteinGym clinical substitutions。cost=0.01。",
+    "parameters": {"type": "object", "properties": {
+      "source_dir": {"type": "string", "description": "可选，本地 FAIR ESM 源码目录；也可通过 HEALTHCLAW_ESM_SOURCE_DIR 配置"},
+      "model_name": {"type": "string", "description": "ESM model name，默认 esm2_t6_8M_UR50D", "default": "esm2_t6_8M_UR50D"}
+    }}
+  }},
+  {"type": "function", "function": {
+    "name": "esm_local_variant_effect_score",
+    "description": "使用真实 FAIR ESM protein language model 对当前可见 missense variant 和局部 wild-type sequence window 做 zero-shot log-prob delta scoring。不会读取 gold；不是校准后的临床致病性分类器。cost=0.05。",
+    "parameters": {"type": "object", "properties": {
+      "mutation": {"type": "string", "description": "可选，形如 R1359W；为空时从 visible_input 自动解析"},
+      "local_window": {"type": "string", "description": "可选，当前可见 local wild-type sequence window，可包含 [R] 形式标记；为空时从 visible_input 解析"},
+      "visible_input": {"type": "string", "description": "当前样本可见输入文本，只能包含预测阶段可见字段"},
+      "source_dir": {"type": "string", "description": "可选，本地 FAIR ESM 源码目录；也可通过 HEALTHCLAW_ESM_SOURCE_DIR 配置"},
+      "model_name": {"type": "string", "description": "ESM model name，默认 esm2_t6_8M_UR50D", "default": "esm2_t6_8M_UR50D"}
+    }, "required": ["visible_input"]}
   }},
   {"type": "function", "function": {
     "name": "gene_protein_integration",

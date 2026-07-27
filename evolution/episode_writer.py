@@ -2,6 +2,7 @@
 情景记忆写入器 - 将病例反思写入 L4
 """
 import os, json, time
+from evolution.memory_policy import normalize_episode
 
 
 class EpisodeWriter:
@@ -16,6 +17,7 @@ class EpisodeWriter:
 
     def write(self, episode: dict):
         """追加一条情景记忆"""
+        episode = normalize_episode(episode)
         os.makedirs(os.path.dirname(self.episodes_file), exist_ok=True)
         with open(self.episodes_file, 'a', encoding='utf-8') as f:
             f.write(json.dumps(episode, ensure_ascii=False) + '\n')
@@ -69,6 +71,7 @@ class EpisodeWriter:
             for ep in episodes:
                 if ep.get("episode_id") == episode_id:
                     ep["outcome_correct"] = outcome_correct
+                    ep = normalize_episode(ep)
                     updated = True
                 f.write(json.dumps(ep, ensure_ascii=False) + '\n')
         return updated

@@ -11,7 +11,11 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
-from bed_reader import open_bed
+
+try:
+    from bed_reader import open_bed
+except Exception:  # pragma: no cover - optional UKB/PLINK dependency
+    open_bed = None
 
 
 class GenomicAnalyzer:
@@ -277,6 +281,8 @@ class GenomicAnalyzer:
     def _ensure_dataset(self):
         if self._bed is not None:
             return
+        if open_bed is None:
+            raise ImportError("Optional dependency 'bed_reader' is not installed; PLINK genomic tools are unavailable.")
 
         prefix = self._resolve_plink_prefix()
         bed_path = prefix.with_suffix(".bed")
