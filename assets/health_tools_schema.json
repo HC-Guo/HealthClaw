@@ -1,7 +1,7 @@
 [
   {"type": "function", "function": {
     "name": "load_user_profile",
-    "description": "加载当前用户的健康画像（基本信息、家族史、过敏史、慢病、用药、健康目标）。首次使用时自动创建空画像。",
+    "description": "加载当前用户的健康画像（基本信息、家族史、过敏史、慢病、用药、健康目标）。当用户询问之前记录的过敏史、慢病、当前方案、长期目标、饮食偏好等个人健康记忆时优先使用。首次使用时自动创建空画像。",
     "parameters": {"type": "object", "properties": {}}
   }},
   {"type": "function", "function": {
@@ -40,7 +40,7 @@
   }},
   {"type": "function", "function": {
     "name": "get_health_timeline",
-    "description": "获取某个健康指标的历史时间线数据，用于分析长期变化趋势。",
+    "description": "获取某个健康指标的历史时间线数据，用于分析长期变化趋势。当用户询问之前记录的体重、血糖、血压、复查安排或指标变化时优先使用。",
     "parameters": {"type": "object", "properties": {
       "indicator": {"type": "string", "description": "指标名称"},
       "period": {"type": "string", "enum": ["3m","6m","1y","3y","all"], "default": "1y", "description": "时间范围"}
@@ -48,7 +48,7 @@
   }},
   {"type": "function", "function": {
     "name": "manage_medication",
-    "description": "管理用户的用药记录：添加新药、停用药物、查看当前用药列表、查看某药详情。",
+    "description": "管理用户的用药记录：添加新药、停用药物、查看当前用药列表、查看某药详情。当用户询问之前记录的用药、当前方案、某药剂量/频次/原因时优先使用 list 或 detail。",
     "parameters": {"type": "object", "properties": {
       "action": {"type": "string", "enum": ["add","stop","list","detail"], "description": "操作类型"},
       "drug_name": {"type": "string", "description": "药物名称"},

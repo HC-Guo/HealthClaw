@@ -4,6 +4,7 @@ Level 1 (原始经验) → Level 2 (策略统计) → Level 3 (规则提炼到L1
 """
 import os, json, time
 from collections import defaultdict
+from evolution.memory_policy import is_distillable_episode, normalize_episode
 
 
 class StrategyDistiller:
@@ -34,14 +35,27 @@ class StrategyDistiller:
             "unverified": 0,
         })
 
-        for ep in episodes:
+        skipped = {
+            "low_quality_or_unverified": 0,
+            "artifact_or_unsafe": 0,
+        }
+
+        for raw_ep in episodes:
+            ep = normalize_episode(raw_ep)
+            if not is_distillable_episode(ep):
+                if ep.get("artifact_risk") == "high" or ep.get("retrieval_policy") == "do_not_retrieve":
+                    skipped["artifact_or_unsafe"] += 1
+                else:
+                    skipped["low_quality_or_unverified"] += 1
+                continue
+
             disease = ep.get("disease", "unknown")
             s = stats[disease]
             s["total_cases"] += 1
 
             for tool, useful in ep.get("tools_useful", {}).items():
                 s["tool_usage"][tool]["called"] += 1
-                if useful:
+                if useful and ep.get("outcome_correct") is True:
                     s["tool_usage"][tool]["useful"] += 1
 
             cc = ep.get("confidence_change", {})
@@ -97,6 +111,14 @@ class StrategyDistiller:
                     "verified_incorrect": s["verified_incorrect"],
                     "unverified": s["unverified"],
                 },
+                "last_distill": time.strftime('%Y-%m-%d %H:%M'),
+            }
+
+        if skipped["low_quality_or_unverified"] or skipped["artifact_or_unsafe"]:
+            strategy["_distill_filter_summary"] = {
+                "skipped_low_quality_or_unverified": skipped["low_quality_or_unverified"],
+                "skipped_artifact_or_unsafe": skipped["artifact_or_unsafe"],
+                "policy": "Only verified, sufficiently high-quality, non-artifact L4 episodes are distilled.",
                 "last_distill": time.strftime('%Y-%m-%d %H:%M'),
             }
 

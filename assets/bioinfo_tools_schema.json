@@ -1,5 +1,39 @@
 [
   {"type": "function", "function": {
+    "name": "gene_reference_lookup",
+    "description": "基因 symbol/alias/Ensembl ID 官方参考查询，调用 MyGene.info 与 HGNC REST。适用：GeneTuring 的 gene alias、gene name conversion、gene location、protein-coding gene 判断。仅使用当前可见问题/实体，不读取 gold。cost=0.03。",
+    "parameters": {"type": "object", "properties": {
+      "term": {"type": "string", "description": "当前问题中可见的基因 symbol、旧名、别名或 Ensembl gene ID，如 C6orf186、ENSG00000148824"},
+      "species": {"type": "string", "description": "物种，默认 human", "default": "human"}
+    }, "required": ["term"]}
+  }},
+  {"type": "function", "function": {
+    "name": "variant_reference_lookup",
+    "description": "rsID 官方参考查询，调用 Ensembl REST 与 MyVariant.info。适用：SNP location、Gene-SNP association。仅使用当前可见 rsID，不读取 gold。cost=0.03。",
+    "parameters": {"type": "object", "properties": {
+      "rsid": {"type": "string", "description": "当前问题中可见的 rsID，如 rs427884"},
+      "species": {"type": "string", "description": "物种，默认 human", "default": "human"}
+    }, "required": ["rsid"]}
+  }},
+  {"type": "function", "function": {
+    "name": "disease_gene_reference_lookup",
+    "description": "疾病-基因关联官方参考查询，调用 Open Targets Platform GraphQL API，并用 NCBI E-utilities 作为补充。适用：GeneTuring 的 Gene disease association。仅使用当前可见疾病名称，不读取 gold。cost=0.04。",
+    "parameters": {"type": "object", "properties": {
+      "disease": {"type": "string", "description": "当前问题中可见的疾病名称，如 Chronic atrial and intestinal dysrhythmia"},
+      "size": {"type": "integer", "description": "返回候选基因数量，默认 10", "default": 10}
+    }, "required": ["disease"]}
+  }},
+  {"type": "function", "function": {
+    "name": "geneturing_reference_answer_tool",
+    "description": "GeneTuring 任务级工具路由器：根据当前可见问题类型调用基因/变异/疾病-基因参考数据库，返回候选答案和结构化证据，而不是隐藏标签。覆盖 gene alias、gene name conversion、gene location、SNP location、Gene-SNP association、protein-coding gene、gene-disease association；DNA alignment 默认只给出序列特征和推荐真实比对工具，远程 BLAST 需显式开启。cost=0.05。",
+    "parameters": {"type": "object", "properties": {
+      "question": {"type": "string", "description": "当前样本的可见 GeneTuring 问题文本"},
+      "task_name": {"type": "string", "description": "当前可见任务名，如 Gene alias、SNP location、Human genome DNA aligment"},
+      "species": {"type": "string", "description": "物种，默认 human", "default": "human"},
+      "run_remote_alignment": {"type": "boolean", "description": "是否对 DNA alignment 启动远程 NCBI BLAST。默认 false，避免慢调用和限流", "default": false}
+    }, "required": ["question"]}
+  }},
+  {"type": "function", "function": {
     "name": "blast_search",
     "description": "BLAST 序列相似性搜索，找同源基因/蛋白。调用 NCBI BLAST API。适用：验证基因/蛋白身份、跨物种比对。详见 memory/L3_sops/bioinformatics_tools_sop.md。cost=0.1。",
     "parameters": {"type": "object", "properties": {

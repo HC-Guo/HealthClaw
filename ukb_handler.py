@@ -19,8 +19,29 @@ from tools.imaging_tools import ImagingAnalyzer
 from tools.integration_tools import MultiOmicsIntegrator
 from tools.interpretation import GeneticInterpreter, ProteomicInterpreter, WearableInterpreter
 from evolution.episode_writer import EpisodeWriter
+from evolution.memory_policy import (
+    analyze_retrieval_set,
+    format_retrieval_context,
+    infer_modality,
+    infer_task_family,
+    normalize_episode,
+    score_memory_for_query,
+    select_balanced_memories,
+)
 from evolution.strategy_distiller import StrategyDistiller
 from tools.bioinfo_tools import blast_search, david_enrichment, interpro_scan, run_bioinfo_cli
+from tools.fundus_tools import flair_fundus_status, flair_fundus_zero_shot
+from tools.gene_reference_tools import (
+    disease_gene_reference_lookup,
+    gene_reference_lookup,
+    geneturing_reference_answer_tool,
+    variant_reference_lookup,
+)
+from tools.monai_imaging_tools import monai_bundle_command, monai_bundle_status, run_monai_bundle_command
+from tools.protein_reference_tools import esm_local_variant_effect_score, esm_variant_effect_status
+from tools.skin_tools import skin_isic_efficientnet_classify, skin_isic_efficientnet_status
+from tools.task_tool_router import execute_tool as execute_task_specific_tool
+from tools.task_tool_router import route_tools as route_task_specific_tools
 from tools.health_data_store import HealthDataStore
 from tools.wearable_tools import WearableDataStore
 from tools.wearable_importer import WearableDataImporter
@@ -354,6 +375,206 @@ class UKBAgentHandler(GenericAgentHandler):
             next_prompt=self._get_anchor_prompt()
         )
 
+    def do_route_task_specific_tools(self, args, response):
+        """按当前任务类型选择专业工具候选，不执行未配置模型。"""
+        task_key = args.get("task_key", "") or args.get("task_name", "")
+        case_metadata = args.get("case_metadata", {})
+        if not isinstance(case_metadata, dict):
+            case_metadata = {}
+        max_tool_calls = int(args.get("max_tool_calls", 3) or 3)
+        yield f"[Action] route_task_specific_tools: task_key={task_key}\n"
+        try:
+            result = route_task_specific_tools(
+                task_key=task_key,
+                case=case_metadata,
+                max_tool_calls=max_tool_calls,
+            )
+        except Exception as e:
+            result = {
+                "status": "error",
+                "msg": str(e),
+                "input_visible_only": True,
+                "gold_label_used": False,
+                "future_cases_used": False,
+            }
+        self.tool_call_log.append(("route_task_specific_tools", 0.01))
+        selected = result.get("selected_tools") or []
+        family = result.get("task_family", "unknown")
+        yield f"[Result]\ntask_family={family}; selected_tools={json.dumps(selected, ensure_ascii=False)}\n"
+        return StepOutcome(data=result, next_prompt=self._get_anchor_prompt())
+
+    def do_execute_task_specific_tool(self, args, response):
+        """执行 route_task_specific_tools 返回的已实现专业工具。"""
+        tool_name = args.get("tool_name", "")
+        task_key = args.get("task_key", "") or args.get("task_name", "")
+        case_metadata = args.get("case_metadata", {})
+        if not isinstance(case_metadata, dict):
+            case_metadata = {}
+        yield f"[Action] execute_task_specific_tool: tool={tool_name}, task_key={task_key}\n"
+        try:
+            result = execute_task_specific_tool(tool_name=tool_name, case=case_metadata, task_key=task_key)
+        except Exception as e:
+            result = {
+                "status": "error",
+                "tool_name": tool_name,
+                "msg": str(e),
+                "input_visible_only": True,
+                "gold_label_used": False,
+                "future_cases_used": False,
+            }
+        self.tool_call_log.append((f"execute_task_specific_tool:{tool_name}", 0.05))
+        top = result.get("top_label_candidate") or {}
+        yield (
+            f"[Result]\nstatus={result.get('status')}; "
+            f"evidence_strength={result.get('evidence_strength')}; "
+            f"recommended_use={result.get('recommended_use')}; "
+            f"top_label={json.dumps(top, ensure_ascii=False)}\n"
+        )
+        return StepOutcome(data=result, next_prompt=self._get_anchor_prompt())
+
+    def do_flair_fundus_status(self, args, response):
+        """检查 FLAIR 眼底 foundation model wrapper 是否可用。"""
+        source_dir = args.get("source_dir", "")
+        model_id = args.get("model_id", "jusiro2/FLAIR")
+        yield "[Action] FLAIR fundus status\n"
+        try:
+            result = flair_fundus_status(source_dir=source_dir or None, model_id=model_id)
+        except Exception as e:
+            result = {"status": "error", "msg": str(e), "input_visible_only": True}
+        self.tool_call_log.append(("flair_fundus_status", 0.01))
+        yield f"[Result]\nstatus={result.get('status')}; import={result.get('flair_import_available')}\n"
+        return StepOutcome(data=result, next_prompt=self._get_anchor_prompt())
+
+    def do_flair_fundus_zero_shot(self, args, response):
+        """使用 FLAIR 对当前可见眼底图像做 zero-shot evidence scoring。"""
+        image_path = args.get("image_path", "")
+        label_options = args.get("label_options", [])
+        source_dir = args.get("source_dir", "")
+        model_id = args.get("model_id", "jusiro2/FLAIR")
+        prompt_mode = args.get("prompt_mode", "domain_knowledge")
+        yield f"[Action] FLAIR fundus zero-shot: image_path={image_path}\n"
+        try:
+            result = flair_fundus_zero_shot(
+                image_path=image_path,
+                label_options=label_options if isinstance(label_options, list) else [],
+                source_dir=source_dir or None,
+                model_id=model_id,
+                prompt_mode=prompt_mode,
+            )
+        except Exception as e:
+            result = {"status": "error", "msg": str(e), "input_visible_only": True}
+        self.tool_call_log.append(("flair_fundus_zero_shot", 0.05))
+        top = result.get("top_label_candidate") or {}
+        yield f"[Result]\nstatus={result.get('status')}; top_label={json.dumps(top, ensure_ascii=False)}\n"
+        return StepOutcome(data=result, next_prompt=self._get_anchor_prompt())
+
+    def do_skin_isic_efficientnet_status(self, args, response):
+        """检查 ISIC2019 EfficientNet-B1 skin lesion classifier 是否可用。"""
+        model_dir = args.get("model_dir", "")
+        yield "[Action] Skin ISIC EfficientNet status\n"
+        try:
+            result = skin_isic_efficientnet_status(model_dir=model_dir or None)
+        except Exception as e:
+            result = {"status": "error", "msg": str(e), "input_visible_only": True}
+        self.tool_call_log.append(("skin_isic_efficientnet_status", 0.01))
+        yield f"[Result]\nstatus={result.get('status')}; weights={result.get('weights_exist')}; timm={result.get('timm_available')}\n"
+        return StepOutcome(data=result, next_prompt=self._get_anchor_prompt())
+
+    def do_skin_isic_efficientnet_classify(self, args, response):
+        """使用真实 ISIC2019 EfficientNet-B1 模型对当前可见皮肤病变图像做分类证据评分。"""
+        image_path = args.get("image_path", "")
+        label_options = args.get("label_options", [])
+        model_dir = args.get("model_dir", "")
+        yield f"[Action] Skin ISIC EfficientNet classify: image_path={image_path}\n"
+        try:
+            result = skin_isic_efficientnet_classify(
+                image_path=image_path,
+                label_options=label_options if isinstance(label_options, list) else [],
+                model_dir=model_dir or None,
+            )
+        except Exception as e:
+            result = {"status": "error", "msg": str(e), "input_visible_only": True}
+        self.tool_call_log.append(("skin_isic_efficientnet_classify", 0.05))
+        top = result.get("top_label_candidate") or {}
+        yield f"[Result]\nstatus={result.get('status')}; top_label={json.dumps(top, ensure_ascii=False)}\n"
+        return StepOutcome(data=result, next_prompt=self._get_anchor_prompt())
+
+    def do_monai_bundle_status(self, args, response):
+        """检查真实 MONAI Model Zoo bundle 是否已安装/下载。"""
+        bundle_key = args.get("bundle_key", "")
+        bundle_dir = args.get("bundle_dir", "")
+        yield f"[Action] MONAI bundle status: {bundle_key}\n"
+        try:
+            result = monai_bundle_status(bundle_key=bundle_key, bundle_dir=bundle_dir or None)
+        except Exception as e:
+            result = {"status": "error", "msg": str(e), "input_visible_only": True}
+        summary = (
+            f"status={result.get('status')}; monai_installed={result.get('monai_installed')}; "
+            f"bundle_root={result.get('bundle_root')}; weights={result.get('model_weights_exist')}; "
+            f"config={result.get('inference_config_exists')}"
+        )
+        self.tool_call_log.append(("monai_bundle_status", 0.01))
+        yield f"[Result]\n{summary}\n"
+        return StepOutcome(data=result, next_prompt=self._get_anchor_prompt())
+
+    def do_esm_variant_effect_status(self, args, response):
+        """检查 FAIR ESM variant-effect wrapper 是否可用。"""
+        source_dir = args.get("source_dir", "")
+        model_name = args.get("model_name", "esm2_t6_8M_UR50D")
+        yield "[Action] ESM variant-effect status\n"
+        try:
+            result = esm_variant_effect_status(source_dir=source_dir or None, model_name=model_name)
+        except Exception as e:
+            result = {"status": "error", "msg": str(e), "input_visible_only": True}
+        self.tool_call_log.append(("esm_variant_effect_status", 0.01))
+        yield f"[Result]\nstatus={result.get('status')}; source_dir={result.get('source_dir')}\n"
+        return StepOutcome(data=result, next_prompt=self._get_anchor_prompt())
+
+    def do_esm_local_variant_effect_score(self, args, response):
+        """使用 FAIR ESM 对当前可见蛋白局部窗口做 missense variant effect scoring。"""
+        mutation = args.get("mutation", "")
+        local_window = args.get("local_window", "")
+        visible_input = args.get("visible_input", "")
+        source_dir = args.get("source_dir", "")
+        model_name = args.get("model_name", "esm2_t6_8M_UR50D")
+        yield f"[Action] ESM local variant effect: mutation={mutation or 'auto'}\n"
+        try:
+            result = esm_local_variant_effect_score(
+                mutation=mutation,
+                local_window=local_window,
+                visible_input=visible_input,
+                source_dir=source_dir or None,
+                model_name=model_name,
+            )
+        except Exception as e:
+            result = {"status": "error", "msg": str(e), "input_visible_only": True}
+        self.tool_call_log.append(("esm_local_variant_effect_score", 0.05))
+        top = result.get("top_label_candidate") or {}
+        yield f"[Result]\nstatus={result.get('status')}; delta={result.get('delta_log_prob_mt_minus_wt')}; top={json.dumps(top, ensure_ascii=False)}\n"
+        return StepOutcome(data=result, next_prompt=self._get_anchor_prompt())
+
+    def do_monai_bundle_command(self, args, response):
+        """生成官方 MONAI bundle inference 命令，不自动执行。"""
+        bundle_key = args.get("bundle_key", "")
+        output_dir = args.get("output_dir", "outputs/monai_bundle")
+        bundle_dir = args.get("bundle_dir", "")
+        dataset_dir = args.get("dataset_dir", "")
+        extra_overrides = args.get("extra_overrides", [])
+        yield f"[Action] Build MONAI bundle command: {bundle_key}\n"
+        try:
+            result = monai_bundle_command(
+                bundle_key=bundle_key,
+                output_dir=output_dir,
+                bundle_dir=bundle_dir or None,
+                dataset_dir=dataset_dir or None,
+                extra_overrides=extra_overrides if isinstance(extra_overrides, list) else [],
+            )
+        except Exception as e:
+            result = {"status": "error", "msg": str(e), "input_visible_only": True}
+        self.tool_call_log.append(("monai_bundle_command", 0.01))
+        yield f"[Result]\nstatus={result.get('status')}; command={result.get('command')}\n"
+        return StepOutcome(data=result, next_prompt=self._get_anchor_prompt())
+
     # ================================================================
     #  多组学整合分析工具
     # ================================================================
@@ -518,11 +739,36 @@ class UKBAgentHandler(GenericAgentHandler):
         """从情景记忆中检索相似病例的处理经验（规则匹配，不用向量库）"""
         disease = args.get("disease", self.current_disease or "")
         key_features = args.get("key_features", [])
+        query_context = {
+            "disease": disease,
+            "key_features": key_features,
+            "dataset": args.get("dataset", ""),
+            "modality": args.get("modality", ""),
+            "task_family": args.get("task_family", ""),
+        }
+        if not query_context["modality"]:
+            query_context["modality"] = infer_modality({
+                "disease": disease,
+                "tags": key_features,
+                "task_name": args.get("task_name", ""),
+                "dataset": query_context["dataset"],
+            })
+        if not query_context["task_family"]:
+            query_context["task_family"] = infer_task_family({
+                "disease": disease,
+                "tags": key_features,
+                "task_name": args.get("task_name", ""),
+                "dataset": query_context["dataset"],
+                "modality": query_context["modality"],
+            }, dataset=query_context["dataset"], modality=query_context["modality"])
 
         yield f"[Action] Recalling similar cases for: {disease}, features={key_features}\n"
         episodes_path = os.path.join(os.path.dirname(__file__),
                                      'memory/L4_episodes/case_episodes.jsonl')
-        cases = self._rule_based_case_retrieval(episodes_path, disease, key_features)
+        cases = self._rule_based_case_retrieval(
+            episodes_path, disease, key_features, query_context=query_context
+        )
+        retrieval_analysis = analyze_retrieval_set(cases)
 
         if cases:
             formatted = self._format_case_memories(cases)
@@ -531,54 +777,41 @@ class UKBAgentHandler(GenericAgentHandler):
             formatted = "未找到相似病例经验。建议按 L1 索引推荐的标准流程进行。"
 
         return StepOutcome(
-            data={"status": "success", "cases_count": len(cases)},
+            data={
+                "status": "success",
+                "cases_count": len(cases),
+                "label_distribution": retrieval_analysis.get("label_distribution", {}),
+                "class_bias_warning": retrieval_analysis.get("class_bias_warning", ""),
+                "conflict_warning_count": len(retrieval_analysis.get("conflict_warnings", [])),
+            },
             next_prompt=self._get_anchor_prompt() + f"\n[情景记忆]\n{formatted}"
         )
 
-    def _rule_based_case_retrieval(self, episodes_path, disease, key_features, max_results=5):
+    def _rule_based_case_retrieval(self, episodes_path, disease, key_features, max_results=8,
+                                   query_context=None):
         if not os.path.exists(episodes_path):
             return []
         scored = []
+        query_context = dict(query_context or {})
+        query_context.setdefault("disease", disease)
+        query_context.setdefault("key_features", key_features)
         try:
             with open(episodes_path, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
                     if not line:
                         continue
-                    ep = json.loads(line)
-                    score = 0
-                    if ep.get("disease", "") == disease:
-                        score += 10
-                    tag_overlap = set(ep.get("tags", [])) & set(key_features)
-                    score += len(tag_overlap) * 2
-                    if ep.get("outcome_correct") is not None:
-                        score += 3
-                    cc = ep.get("confidence_change", {})
-                    conf_lift = abs(cc.get("after_tools", 0) - cc.get("before_tools", 0))
-                    if conf_lift > 0.3:
-                        score += 5
+                    ep = normalize_episode(json.loads(line))
+                    score, reasons = score_memory_for_query(ep, query_context)
                     if score > 0:
+                        ep["_retrieval_reasons"] = reasons
                         scored.append((score, ep))
         except Exception:
             return []
-        scored.sort(key=lambda x: -x[0])
-        return [ep for _, ep in scored[:max_results]]
+        return select_balanced_memories(scored, max_results=max_results)
 
     def _format_case_memories(self, cases):
-        lines = []
-        for i, c in enumerate(cases, 1):
-            tools_info = ", ".join(
-                f"{t}({'有用' if c.get('tools_useful',{}).get(t) else '无增量'})"
-                for t in c.get("tools_used", [])
-            )
-            cc = c.get("confidence_change", {})
-            lines.append(
-                f"Case#{i} [{c.get('disease','')}] {c.get('patient_profile','')}\n"
-                f"  工具: {tools_info}\n"
-                f"  置信度: {cc.get('before_tools','?')}→{cc.get('after_tools','?')}\n"
-                f"  经验: {c.get('key_lesson','')}"
-            )
-        return "\n".join(lines)
+        return format_retrieval_context(cases)
 
     # ================================================================
     #  诊断提交工具
@@ -688,6 +921,65 @@ class UKBAgentHandler(GenericAgentHandler):
     # ================================================================
     #  生信工具 (BLAST / DAVID / InterProScan / CLI)
     # ================================================================
+
+    def do_gene_reference_lookup(self, args, response):
+        """基因 symbol/alias/Ensembl ID 查询，调用 MyGene.info 和 HGNC REST。"""
+        term = args.get("term", "") or args.get("query", "")
+        species = args.get("species", "human")
+        yield f"[Action] gene_reference_lookup: term={term}, species={species}\n"
+        try:
+            out = gene_reference_lookup(term=term, species=species)
+        except Exception as e:
+            out = {"status": "error", "msg": str(e), "input_visible_only": True}
+        hints = out.get("answer_hints", {})
+        yield f"[Result] status={out.get('status')}; answer_hints={json.dumps(hints, ensure_ascii=False)}\n"
+        return StepOutcome(data=out, next_prompt=self._get_anchor_prompt())
+
+    def do_variant_reference_lookup(self, args, response):
+        """rsID 查询，调用 Ensembl REST 和 MyVariant.info。"""
+        rsid = args.get("rsid", "") or args.get("query", "")
+        species = args.get("species", "human")
+        yield f"[Action] variant_reference_lookup: rsid={rsid}, species={species}\n"
+        try:
+            out = variant_reference_lookup(rsid=rsid, species=species)
+        except Exception as e:
+            out = {"status": "error", "msg": str(e), "input_visible_only": True}
+        hints = out.get("answer_hints", {})
+        yield f"[Result] status={out.get('status')}; answer_hints={json.dumps(hints, ensure_ascii=False)}\n"
+        return StepOutcome(data=out, next_prompt=self._get_anchor_prompt())
+
+    def do_disease_gene_reference_lookup(self, args, response):
+        """疾病-基因关联查询，调用 Open Targets 和 NCBI E-utilities。"""
+        disease = args.get("disease", "") or args.get("query", "")
+        size = int(args.get("size", 10) or 10)
+        yield f"[Action] disease_gene_reference_lookup: disease={disease}\n"
+        try:
+            out = disease_gene_reference_lookup(disease=disease, size=size)
+        except Exception as e:
+            out = {"status": "error", "msg": str(e), "input_visible_only": True}
+        hints = out.get("answer_hints", {})
+        yield f"[Result] status={out.get('status')}; answer_hints={json.dumps(hints, ensure_ascii=False)}\n"
+        return StepOutcome(data=out, next_prompt=self._get_anchor_prompt())
+
+    def do_geneturing_reference_answer_tool(self, args, response):
+        """GeneTuring 样式问题路由到真实基因/变异参考数据库。"""
+        question = args.get("question", "")
+        task_name = args.get("task_name", "")
+        species = args.get("species", "human")
+        run_remote_alignment = bool(args.get("run_remote_alignment", False))
+        yield f"[Action] geneturing_reference_answer_tool: task={task_name}\n"
+        try:
+            out = geneturing_reference_answer_tool(
+                question=question,
+                task_name=task_name,
+                species=species,
+                run_remote_alignment=run_remote_alignment,
+            )
+        except Exception as e:
+            out = {"status": "error", "msg": str(e), "input_visible_only": True}
+        hints = out.get("answer_hints", {})
+        yield f"[Result] status={out.get('status')}; answer_hints={json.dumps(hints, ensure_ascii=False)}\n"
+        return StepOutcome(data=out, next_prompt=self._get_anchor_prompt())
 
     def do_blast_search(self, args, response):
         """BLAST 序列相似性搜索，调用 NCBI API。详见 L3 bioinformatics_tools_sop。"""
@@ -847,7 +1139,11 @@ class UKBAgentHandler(GenericAgentHandler):
 
         return StepOutcome(
             data=result,
-            next_prompt=self._get_anchor_prompt() + f"\n[搜索结果 质量={quality}]\n{formatted}" + fallback_info
+            next_prompt=(
+                self._direct_answer_prompt(f"搜索结果 质量={quality}")
+                + f"\n[搜索结果 质量={quality}]\n{formatted}"
+                + fallback_info
+            )
         )
 
     def _execute_web_search(self, query, source, max_results):
@@ -1866,7 +2162,7 @@ class UKBAgentHandler(GenericAgentHandler):
         yield f"[Result]\n{summary}\n"
         return StepOutcome(
             data={"status": "success", "profile": profile},
-            next_prompt=self._get_anchor_prompt() + "\n[用户画像已加载] 请根据画像为用户提供个性化服务。"
+            next_prompt=self._direct_answer_prompt("用户画像已加载")
         )
 
     def do_update_user_profile(self, args, response):
@@ -1948,11 +2244,11 @@ class UKBAgentHandler(GenericAgentHandler):
         if not trend:
             return StepOutcome(
                 {"status": "info", "msg": f"未找到 {indicator} 的历史数据。"},
-                next_prompt=self._get_anchor_prompt()
+                next_prompt=self._direct_answer_prompt("健康时间线未找到匹配数据")
             )
         yield f"[Result] {len(trend)} data points\n"
         return StepOutcome(data={"indicator": indicator, "trend": trend},
-                           next_prompt=self._get_anchor_prompt())
+                           next_prompt=self._direct_answer_prompt("健康时间线已加载"))
 
     def do_manage_medication(self, args, response):
         """管理用药"""
@@ -1978,7 +2274,7 @@ class UKBAgentHandler(GenericAgentHandler):
             result = {"status": "error", "msg": f"未知操作: {action}"}
 
         yield f"[Result] {smart_format(result)}\n"
-        return StepOutcome(data=result, next_prompt=self._get_anchor_prompt())
+        return StepOutcome(data=result, next_prompt=self._direct_answer_prompt("用药信息已加载"))
 
     def do_check_drug_interaction(self, args, response):
         """检查药物相互作用"""

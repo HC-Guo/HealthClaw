@@ -65,6 +65,140 @@ def _is_llm_error_response(response):
         return True
     return False
 
+def _visible_user_text(text):
+    visible = text or ""
+    for tag in ["thinking", "think", "summary", "tool_use", "tool_result", "clinical_context"]:
+        visible = re.sub(rf"<{tag}>[\s\S]*?</{tag}>", "", visible, flags=re.IGNORECASE)
+    return visible.strip()
+
+def _is_protocol_scaffold_answer(text):
+    visible = _visible_user_text(text)
+    lowered = re.sub(r"\s+", " ", visible).strip().lower()
+    if not lowered:
+        return False
+
+    protocol_markers = [
+        "i understand the protocols",
+        "i understand the protocol requirements",
+        "i understand the two issues",
+        "i understand - i'll make sure",
+        "protocols acknowledged",
+        "protocol violations",
+        "i apologize for the protocol violations",
+        "code block requirement",
+        "code blocks first",
+        "summary protocol",
+        "`<summary>` protocol",
+        "<summary> protocol",
+        "follow these protocols strictly",
+        "going forward, i will ensure",
+        "could you please clarify what task",
+        "awaiting user's task",
+    ]
+    if any(marker in lowered for marker in protocol_markers) and (
+        "protocol" in lowered or "code block" in lowered or "summary" in lowered
+    ):
+        return True
+
+    first_sentence = lowered[:220]
+    workspace_markers = [
+        "current context", "current state", "workspace", "memory", "task", "files",
+        "sop", "directory", "directories", "path", "paths", "structure",
+    ]
+    if (
+        "let me first check" in first_sentence
+        or "let me first understand" in first_sentence
+        or "let me first explore" in first_sentence
+        or "let me start by reading" in first_sentence
+        or "let me start by checking" in first_sentence
+        or "let me start by understanding" in first_sentence
+        or "i need to first understand" in first_sentence
+        or "i need to first check" in first_sentence
+    ) and any(marker in first_sentence for marker in workspace_markers):
+        return True
+    if "check my current" in first_sentence and any(marker in first_sentence for marker in workspace_markers):
+        return True
+    if (
+        "working memory and conversation history are both empty" in lowered
+        or "don't have context about what task" in lowered
+        or "errors in previous turns" in lowered
+        or "don't have context about the original task" in lowered
+        or "could you please clarify what task" in lowered
+        or "what task or question can i help you with" in lowered
+    ):
+        return True
+    if "no actual task or question" in lowered and (
+        "how can i assist" in lowered or "what you'd like help with" in lowered
+    ):
+        return True
+    chinese_scaffold_markers = [
+        "先了解当前",
+        "需要先了解当前",
+        "检查工作目录",
+        "工作上下文",
+        "没有之前对话的上下文",
+        "当前需要完成的任务",
+        "之前的协议错误",
+        "协议违规",
+        "我理解了两条协议要求",
+        "代码执行协议",
+        "code_run 调用问题",
+        "请提供患者的 eid",
+        "需要患者的 ukb eid",
+        "先调用 load_patient",
+        "我是 kiro",
+        "代码开发或调试",
+        "系统配置或基础设施",
+        "l1_index.json",
+        "路径不存在",
+        "探索当前环境",
+        "让我先查看当前",
+        "我来继续工作",
+        "cases目录",
+        "案例文件夹",
+        "task.json",
+        "读取每个案例",
+    ]
+    visible_lower = visible.lower()
+    if any(marker in visible_lower for marker in chinese_scaffold_markers):
+        return True
+    if len(visible_lower) <= 80 and (
+        "让我帮您查一下" in visible_lower
+        or "我来帮您查一下" in visible_lower
+        or "让我帮你查一下" in visible_lower
+    ):
+        return True
+
+    return False
+
+def _has_substantial_visible_answer(text, min_chars=40):
+    if _is_protocol_scaffold_answer(text):
+        return False
+    visible = re.sub(r"\s+", "", _visible_user_text(text))
+    return len(visible) >= min_chars
+
+def _code_run_has_executable_payload(args, response):
+    if args.get("code") or args.get("script") or args.get("command"):
+        return True
+    if args.get("_raw") and re.search(r'"(?:code|script|command)"\s*:', str(args.get("_raw"))):
+        return True
+    code_type = args.get("type", "python")
+    pattern = rf"```{re.escape(str(code_type))}\n(.*?)\n```"
+    return bool(re.search(pattern, response.content or "", re.DOTALL))
+
+def _should_skip_non_actionable_tool(tool_name, args, response):
+    return (
+        tool_name == "code_run"
+        and not _code_run_has_executable_payload(args, response)
+        and _has_substantial_visible_answer(response.content)
+    )
+
+def _should_end_no_writeback_visible_answer(handler, response):
+    return (
+        getattr(handler, "_benchmark_no_write_back", False)
+        and _has_substantial_visible_answer(response.content)
+    )
+
 LLM_ERROR_MAX_RETRIES = 2
 LLM_ERROR_RETRY_WAIT = 10
 
@@ -115,6 +249,22 @@ def agent_runner_loop(client, system_prompt, user_input, handler, tools_schema, 
             tool_call = response.tool_calls[0] 
             tool_name = tool_call.function.name
             args = json.loads(tool_call.function.arguments)
+
+        if _should_end_no_writeback_visible_answer(handler, response):
+            if verbose:
+                yield "\n[Info] No-writeback visible answer produced; skipped follow-up tool call.\n"
+            if tracker:
+                tracker.total_turns = turn + 1
+                tracker.save_report()
+            return {'result': 'CURRENT_TASK_DONE', 'data': response}
+
+        if _should_skip_non_actionable_tool(tool_name, args, response):
+            if verbose:
+                yield "\n[Info] Visible user-facing answer produced; skipped non-actionable code_run tool call.\n"
+            if tracker:
+                tracker.total_turns = turn + 1
+                tracker.save_report()
+            return {'result': 'CURRENT_TASK_DONE', 'data': response}
 
         if tool_name == 'no_tool': pass
         else: 
